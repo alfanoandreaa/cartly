@@ -6,7 +6,6 @@ import { useSession } from "next-auth/react";
 import {
   Bell,
   ChevronDown,
-  Compass,
   FolderHeart,
   LayoutGrid,
   Menu,
@@ -31,8 +30,7 @@ import { cn } from "@/lib/utils";
 
 const mainLinks = [
   { href: "/app/dashboard", label: "All picks", icon: LayoutGrid },
-  { href: "/app/dashboard/collections", label: "Collections", icon: FolderHeart },
-  { href: "/app/dashboard/discover", label: "Discover", icon: Compass, pro: true }
+  { href: "/app/dashboard/collections", label: "Collections", icon: FolderHeart }
 ];
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -121,7 +119,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </Button>
       </div>
       <nav className="mt-6 space-y-1 px-3">
-        {mainLinks.map(({ href, label, icon: Icon, pro }) => {
+        {mainLinks.map(({ href, label, icon: Icon }) => {
           const active = href === "/app/dashboard" ? pathname === href : pathname.startsWith(href);
           return (
             <Link
@@ -135,7 +133,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             >
               <Icon className={cn("h-[18px] w-[18px]", active && "text-lime")} />
               {label}
-              {pro && <Sparkles className="ml-auto h-3.5 w-3.5 text-lime" />}
             </Link>
           );
         })}

@@ -5,20 +5,6 @@ import { getToken } from "next-auth/jwt";
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
-    if (!process.env.ADMIN_PASSWORD) return NextResponse.next();
-    const authorization = request.headers.get("authorization");
-    if (authorization?.startsWith("Basic ")) {
-      const decoded = atob(authorization.slice(6));
-      const [, password] = decoded.split(":");
-      if (password === process.env.ADMIN_PASSWORD) return NextResponse.next();
-    }
-    return new NextResponse("Authentication required", {
-      status: 401,
-      headers: { "WWW-Authenticate": 'Basic realm="Cartly Admin"' }
-    });
-  }
-
   // Without a database Cartly intentionally runs in a read-friendly demo mode.
   if (!process.env.DATABASE_URL) return NextResponse.next();
 
@@ -36,14 +22,11 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/admin/:path*",
-    "/api/admin/:path*",
     "/app/dashboard/:path*",
     "/app/onboarding",
     "/api/products/:path*",
     "/api/collections/:path*",
     "/api/share/:path*",
-    "/api/discover/:path*",
     "/api/alerts/:path*",
     "/api/notifications/:path*",
     "/api/user/:path*",

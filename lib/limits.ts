@@ -6,7 +6,6 @@ export const PLAN_LIMITS = {
     collections: 3,
     sharing: false,
     alerts: false,
-    discover: false,
     refreshHours: 24
   },
   PRO: {
@@ -14,7 +13,6 @@ export const PLAN_LIMITS = {
     collections: Number.POSITIVE_INFINITY,
     sharing: true,
     alerts: true,
-    discover: true,
     refreshHours: 6
   }
 } as const;

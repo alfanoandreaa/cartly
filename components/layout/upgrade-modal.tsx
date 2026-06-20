@@ -31,7 +31,7 @@ export function UpgradeModal({ open, onClose }: { open: boolean; onClose: () => 
             Keep every good find, get price-drop alerts, and unlock a faster, smarter Cartly.
           </p>
           <div className="mt-7 grid gap-3 sm:grid-cols-2">
-            {["20 active picks", "Unlimited collections", "Price & stock alerts", "Full Discover feed"].map((item) => (
+            {["20 active picks", "Unlimited collections", "Price & stock alerts", "Public sharing"].map((item) => (
               <p key={item} className="flex items-center gap-3 text-sm">
                 <span className="grid h-5 w-5 place-items-center rounded-full bg-lime/15 text-lime">
                   <Check className="h-3.5 w-3.5" />

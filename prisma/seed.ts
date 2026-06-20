@@ -1,6 +1,6 @@
 import { hash } from "bcryptjs";
-import { PrismaClient, type DiscoverCategory } from "@prisma/client";
-import { demoProducts, discoverProducts } from "../lib/demo-data";
+import { PrismaClient } from "@prisma/client";
+import { demoProducts } from "../lib/demo-data";
 
 const prisma = new PrismaClient();
 
@@ -39,20 +39,6 @@ async function main() {
       priority: product.priority,
       tags: product.tags,
       lastCheckedAt: new Date()
-    }))
-  });
-
-  await prisma.discoverProduct.deleteMany();
-  await prisma.discoverProduct.createMany({
-    data: discoverProducts.map((product) => ({
-      title: product.title,
-      url: product.url,
-      imageUrl: product.imageUrl,
-      siteName: product.siteName,
-      price: product.price,
-      currency: product.currency,
-      category: product.category as DiscoverCategory,
-      saves: product.saves
     }))
   });
 

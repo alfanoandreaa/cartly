@@ -52,17 +52,23 @@ cartly-demo
 - Automated tracking: call `/api/cron/track?cadence=all` from any scheduler and
   send `Authorization: Bearer CRON_SECRET`.
 
+## Store-aware product collection
+
+Cartly identifies the retailer before extracting product data. Dedicated
+adapters currently cover Amazon, Temu, AliExpress, eBay, Etsy, Walmart, Zalando,
+SHEIN, ASOS, Zara, IKEA, and Nike. Each adapter defines the retailer-specific
+title, price, image, currency, and availability fields. Unknown stores use the
+universal JSON-LD, OpenGraph, and semantic HTML fallback.
+
 ## Important routes
 
 - `/` — landing page
 - `/app/dashboard` — personal wishlist
 - `/app/dashboard/add-product` — scrape and save a product
 - `/app/dashboard/collections` — collection management
-- `/app/dashboard/discover` — Cartly Pro feed
 - `/app/dashboard/settings` — profile, notifications, billing, and data
 - `/pricing` — Free and Cartly Pro comparison
 - `/share/[slug]` — public product or collection
-- `/admin` — protected Discover curation
 
 ## Verification
 

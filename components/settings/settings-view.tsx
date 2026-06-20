@@ -38,7 +38,7 @@ export function SettingsView() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-3"><h2 className="text-lg font-semibold">Subscription</h2><PlanBadge /></div>
-              <p className="mt-2 text-sm text-muted">You’re on Cartly Free. Upgrade for alerts, sharing, and Discover.</p>
+              <p className="mt-2 text-sm text-muted">You’re on Cartly Free. Upgrade for alerts, sharing, and faster tracking.</p>
             </div>
             <Button onClick={() => window.location.href = "/pricing"}>View Cartly Pro</Button>
           </div>

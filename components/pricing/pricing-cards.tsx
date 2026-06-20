@@ -17,9 +17,9 @@ const proFeatures = [
   "Save up to 20 products",
   "Unlimited collections",
   "Price and stock alerts",
-  "Discover trending picks",
   "Public sharing",
-  "Priority 6-hour refresh"
+  "Priority 6-hour refresh",
+  "Advanced price history"
 ];
 
 export function PricingCards({ compact = false }: { compact?: boolean }) {

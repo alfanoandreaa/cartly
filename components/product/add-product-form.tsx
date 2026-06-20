@@ -22,12 +22,16 @@ type ScrapeResult = {
   currency: string;
   siteName: string;
   inStock: boolean;
+  storeKey?: string;
+  extractionMethod?: "store-adapter" | "structured-data" | "universal";
 };
 
 type ScrapeStatus = {
-  stage: "idle" | "validating" | "connecting" | "reading" | "extracting" | "browser" | "complete" | "error";
+  stage: "idle" | "validating" | "detecting" | "connecting" | "reading" | "extracting" | "browser" | "complete" | "error";
   progress: number;
   message: string;
+  storeName?: string;
+  storeKey?: string;
 };
 
 const initialScrapeStatus: ScrapeStatus = {
@@ -150,7 +154,9 @@ export function AddProductForm() {
             setScrapeStatus({
               stage: event.stage,
               progress: Number(event.progress),
-              message: String(event.message)
+              message: String(event.message),
+              storeName: event.storeName ? String(event.storeName) : undefined,
+              storeKey: event.storeKey ? String(event.storeKey) : undefined
             });
           } else if (event.type === "result") {
             collected = event.product as ScrapeResult;
@@ -176,7 +182,9 @@ export function AddProductForm() {
         progress: 100,
         message: missing.length
           ? `Details collected. Please review the ${missing.join(", ")}.`
-          : "Title, price, and image collected successfully."
+          : "Title, price, and image collected successfully.",
+        storeName: collected.siteName,
+        storeKey: collected.storeKey
       });
       if (missing.length) toast.warning("Product found — a few details need your review");
       else toast.success("Product details collected automatically");
@@ -348,6 +356,22 @@ export function AddProductForm() {
               {scrapeStatus.stage === "idle" ? "AUTO" : `${scrapeStatus.progress}%`}
             </span>
           </div>
+          {scrapeStatus.storeName && (
+            <div className="mt-2 flex items-center gap-2 pl-8 text-[10px] uppercase tracking-[.12em] text-muted">
+              <span className="rounded-full border border-lime/20 bg-lime/[0.07] px-2 py-1 text-lime">
+                {scrapeStatus.storeName}
+              </span>
+              <span>
+                {result?.extractionMethod === "store-adapter"
+                  ? "Store-specific extraction"
+                  : result?.extractionMethod === "structured-data"
+                    ? "Structured product data"
+                    : scrapeStatus.stage === "detecting" || loading
+                      ? "Selecting the right product layout"
+                      : "Universal extraction"}
+              </span>
+            </div>
+          )}
           <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-white/10">
             <div
               className={`h-full rounded-full transition-[width,background-color] duration-500 ${

@@ -23,16 +23,6 @@ enum ShareType {
   COLLECTION
 }
 
-enum DiscoverCategory {
-  FASHION
-  HOME
-  BEAUTY
-  TECH
-  BOOKS
-  FOOD
-  OTHER
-}
-
 enum NotificationType {
   PRICE_DROP
   BACK_IN_STOCK
@@ -126,19 +116,6 @@ model SharedLink {
 
   @@index([userId])
   @@index([targetId])
-}
-
-model DiscoverProduct {
-  id        String           @id @default(cuid())
-  title     String
-  url       String
-  imageUrl  String
-  siteName  String
-  price     Decimal          @db.Decimal(12, 2)
-  currency  String           @default("EUR")
-  category  DiscoverCategory
-  saves     Int              @default(0)
-  createdAt DateTime         @default(now())
 }
 
 model Notification {

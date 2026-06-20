@@ -132,38 +132,3 @@ export const demoCollections = [
   { id: "creative", name: "Creative kit", emoji: "📷", count: 2, imageUrl: demoProducts[1].imageUrl },
   { id: "rotation", name: "Everyday rotation", emoji: "👟", count: 1, imageUrl: demoProducts[2].imageUrl }
 ];
-
-const discoverSeed = [
-  ["Stoneware Pour-over Set", "Kinto", "HOME", 72, "photo-1495474472287-4d71bcdd2085"],
-  ["Nothing Phone (3)", "Nothing", "TECH", 799, "photo-1598327105666-5b89351aff97"],
-  ["Linen Overshirt", "Arket", "FASHION", 89, "photo-1598033129183-c4f50c736f10"],
-  ["The Creative Act", "Penguin", "BOOKS", 24, "photo-1544947950-fa07a98d237f"],
-  ["Ceramic Table Lamp", "Ferm Living", "HOME", 199, "photo-1540932239986-30128078f3c5"],
-  ["Barrier Repair Serum", "Byoma", "BEAUTY", 18, "photo-1611930022073-b7a4ba5fcccd"],
-  ["Organic Matcha Kit", "Ippodo", "FOOD", 48, "photo-1515823064-d6e0c04616a7"],
-  ["Mechanical Keyboard", "Keychron", "TECH", 129, "photo-1587829741301-dc798b83add3"],
-  ["Trail Running Vest", "Satisfy", "FASHION", 210, "photo-1551698618-1dfe5d97d256"],
-  ["Field Notes Archive", "Field Notes", "OTHER", 34, "photo-1531346878377-a5be20888e57"],
-  ["Stacking Glasses", "HAY", "HOME", 39, "photo-1513558161293-cdaf765ed2fd"],
-  ["E-reader Paper Pro", "reMarkable", "TECH", 649, "photo-1544716278-ca5e3f4abd8c"],
-  ["Aesop Hand Balm", "Aesop", "BEAUTY", 31, "photo-1556228720-195a672e8a03"],
-  ["Tokyo Stories", "Monocle", "BOOKS", 42, "photo-1543002588-bfa74002ed7e"],
-  ["Single-origin Coffee", "April", "FOOD", 22, "photo-1447933601403-0c6688de566e"],
-  ["Studio Tote", "Baggu", "FASHION", 58, "photo-1553062407-98eeb64c6a62"],
-  ["Portable Projector", "Xgimi", "TECH", 599, "photo-1601944179066-29786cb9d32a"],
-  ["Wool Throw", "Muuto", "HOME", 119, "photo-1583845112203-454c2254edce"],
-  ["Mineral Sunscreen", "Salt & Stone", "BEAUTY", 32, "photo-1556229010-6c3f2c9ca5f8"],
-  ["Travel Chess Set", "Printworks", "OTHER", 49, "photo-1586165368502-1bad197a6461"]
-] as const;
-
-export const discoverProducts = discoverSeed.map((item, index) => ({
-  id: `discover-${index + 1}`,
-  title: item[0],
-  siteName: item[1],
-  category: item[2],
-  price: item[3],
-  currency: "EUR",
-  url: "https://example.com",
-  saves: 91 + index * 13,
-  imageUrl: `https://images.unsplash.com/${item[4]}?auto=format&fit=crop&w=900&q=85`
-}));

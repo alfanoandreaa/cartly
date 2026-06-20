@@ -79,7 +79,7 @@ export async function POST(request: Request) {
           to: user.email,
           subject: "A quick note about your Cartly Pro payment",
           title: "Your payment needs a little attention",
-          body: "Stripe couldn’t process your latest Cartly Pro payment. Update your billing details to keep alerts, sharing, and Discover running.",
+          body: "Stripe couldn’t process your latest Cartly Pro payment. Update your billing details to keep alerts, sharing, and priority tracking running.",
           cta: { label: "Manage billing", href: `${process.env.NEXT_PUBLIC_APP_URL}/app/dashboard/settings` }
         });
       }

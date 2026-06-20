@@ -55,9 +55,93 @@ const SCRAPER_API_KEY = process.env.SCRAPERAPI_KEY?.trim();
 
 function scraperApiEndpoint(targetUrl: string, render: boolean) {
   const params = new URLSearchParams({ api_key: SCRAPER_API_KEY!, url: targetUrl });
-  // `render` runs the page in a real browser for JavaScript-heavy stores.
   if (render) params.set("render", "true");
   return `https://api.scraperapi.com/?${params.toString()}`;
+}
+
+// ScraperAPI structured data endpoint — returns parsed JSON for supported
+// retailers (Amazon, eBay, Walmart, …) instead of raw HTML.
+function scraperApiStructuredEndpoint(targetUrl: string) {
+  const params = new URLSearchParams({
+    api_key: SCRAPER_API_KEY!,
+    url: targetUrl,
+    autoparse: "true"
+  });
+  return `https://api.scraperapi.com/?${params.toString()}`;
+}
+
+// Retailers whose structured-data endpoint returns reliable price/title/image.
+const AUTOPARSE_DOMAINS = [/amazon\./i, /ebay\./i, /walmart\./i];
+
+function supportsAutoparse(url: string) {
+  try {
+    const hostname = new URL(url).hostname;
+    return AUTOPARSE_DOMAINS.some((re) => re.test(hostname));
+  } catch {
+    return false;
+  }
+}
+
+async function fetchStructuredProduct(
+  url: string,
+  adapter: StoreAdapter,
+  report?: ProgressReporter
+): Promise<ScrapedProduct | null> {
+  if (!SCRAPER_API_KEY || !supportsAutoparse(url)) return null;
+
+  await report?.({
+    stage: "connecting",
+    progress: 35,
+    message: `Connecting to ${adapter.name}…`
+  });
+
+  const response = await fetch(scraperApiStructuredEndpoint(url), {
+    signal: AbortSignal.timeout(30_000),
+    cache: "no-store"
+  });
+  if (!response.ok) return null;
+
+  await report?.({ stage: "extracting", progress: 70, message: "Reading product data…" });
+
+  const data = (await response.json()) as Record<string, any>;
+
+  // ScraperAPI returns different shapes for different retailers.
+  const rawPrice =
+    data.pricing ??
+    data.price ??
+    data.sale_price ??
+    data.buybox_winner?.price ??
+    null;
+  const price = normalizePrice(typeof rawPrice === "string" ? rawPrice : String(rawPrice ?? ""));
+
+  const title =
+    cleanText(data.name ?? data.title ?? data.product_name ?? "") || "Untitled pick";
+
+  const rawImages: unknown[] = Array.isArray(data.images)
+    ? data.images
+    : data.image
+      ? [data.image]
+      : [];
+  const imageUrl =
+    rawImages
+      .map((img) =>
+        typeof img === "string" ? img : (img as any)?.link ?? (img as any)?.url ?? ""
+      )
+      .find((src) => typeof src === "string" && src.startsWith("http")) ?? null;
+
+  const hostname = new URL(url).hostname.toLowerCase();
+
+  return {
+    title: title.slice(0, 240),
+    imageUrl,
+    price,
+    currency: inferCurrency(String(rawPrice ?? "")) ?? adapter.defaultCurrency?.(hostname) ?? "EUR",
+    siteName: adapter.name,
+    inStock: true,
+    storeKey: adapter.key,
+    extractionMethod: "structured-data",
+    priceSource: "json-ld"
+  };
 }
 
 export function normalizePrice(value?: string | number | null) {
@@ -562,7 +646,27 @@ export async function scrapeProduct(input: string, report?: ProgressReporter): P
     storeKey: adapter.key
   });
 
-  // JavaScript-heavy stores need a real browser even for the first read.
+  // Step 1: for supported retailers use ScraperAPI's structured-data parser —
+  // it returns pre-parsed price/title/image directly, bypassing HTML fragility.
+  try {
+    const structured = await fetchStructuredProduct(url, adapter, report);
+    if (structured) {
+      await report?.({
+        stage: "complete",
+        progress: 100,
+        message: structured.price
+          ? `${structured.siteName} product details ready`
+          : "Price not detected — enter it manually",
+        storeName: structured.siteName,
+        storeKey: adapter.key
+      });
+      return structured;
+    }
+  } catch {
+    // Fall through to HTML scraping.
+  }
+
+  // Step 2: fetch the page HTML (with JS rendering for browser-heavy stores).
   const rendered = Boolean(SCRAPER_API_KEY) && adapter.browserPreferred === true;
   let initialHtml = "";
   let finalUrl = url;
@@ -572,7 +676,7 @@ export async function scrapeProduct(input: string, report?: ProgressReporter): P
     finalUrl = fetched.finalUrl;
     adapter = detectStore(finalUrl);
   } catch {
-    // The rendering step below can still recover.
+    // Step 3 can still recover.
   }
 
   if (initialHtml) {
@@ -597,7 +701,7 @@ export async function scrapeProduct(input: string, report?: ProgressReporter): P
     }
   }
 
-  // Second pass: render JavaScript and retry — unless we already rendered above.
+  // Step 3: render JavaScript and retry — unless we already rendered above.
   if (!(rendered && initialHtml)) {
     try {
       const renderedHtml = SCRAPER_API_KEY

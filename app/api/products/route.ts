@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
-import { demoProducts } from "@/lib/demo-data";
 import { productLimitState } from "@/lib/limits";
 import { prisma } from "@/lib/prisma";
 
@@ -21,7 +20,9 @@ const productSchema = z.object({
 
 export async function GET() {
   const user = await getCurrentUser();
-  if (!process.env.DATABASE_URL || user.id === "demo-user") return NextResponse.json(demoProducts);
+  if (!process.env.DATABASE_URL || user.id === "demo-user") {
+    return NextResponse.json([], { headers: { "x-cartly-client-storage": "true" } });
+  }
 
   const products = await prisma.product.findMany({
     where: { userId: user.id },
@@ -38,15 +39,23 @@ export async function POST(request: Request) {
 
   const count =
     !process.env.DATABASE_URL || user.id === "demo-user"
-      ? demoProducts.length
+      ? 0
       : await prisma.product.count({ where: { userId: user.id } });
   const state = productLimitState(user.plan, count);
   if (state.blocked) return NextResponse.json({ error: "LIMIT_REACHED" }, { status: 403 });
 
   if (!process.env.DATABASE_URL || user.id === "demo-user") {
     return NextResponse.json(
-      { id: crypto.randomUUID(), ...parsed.data, warning: state.warning ? "APPROACHING_LIMIT" : undefined },
-      { status: 201 }
+      {
+        id: crypto.randomUUID(),
+        ...parsed.data,
+        priceHistory: parsed.data.price
+          ? [{ price: parsed.data.price, date: new Date().toISOString() }]
+          : [],
+        createdAt: new Date().toISOString(),
+        warning: state.warning ? "APPROACHING_LIMIT" : undefined
+      },
+      { status: 201, headers: { "x-cartly-client-storage": "true" } }
     );
   }
 

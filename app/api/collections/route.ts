@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
-import { demoCollections } from "@/lib/demo-data";
 import { limitsFor } from "@/lib/limits";
 import { prisma } from "@/lib/prisma";
 
@@ -13,7 +12,9 @@ const collectionSchema = z.object({
 
 export async function GET() {
   const user = await getCurrentUser();
-  if (!process.env.DATABASE_URL || user.id === "demo-user") return NextResponse.json(demoCollections);
+  if (!process.env.DATABASE_URL || user.id === "demo-user") {
+    return NextResponse.json([], { headers: { "x-cartly-client-storage": "true" } });
+  }
 
   const collections = await prisma.collection.findMany({
     where: { userId: user.id },
@@ -29,14 +30,17 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Give your collection a name." }, { status: 400 });
   const count =
     !process.env.DATABASE_URL || user.id === "demo-user"
-      ? demoCollections.length
+      ? 0
       : await prisma.collection.count({ where: { userId: user.id } });
 
   if (count >= limitsFor(user.plan).collections) {
     return NextResponse.json({ error: "COLLECTION_LIMIT_REACHED" }, { status: 403 });
   }
   if (!process.env.DATABASE_URL || user.id === "demo-user") {
-    return NextResponse.json({ id: crypto.randomUUID(), ...parsed.data }, { status: 201 });
+    return NextResponse.json(
+      { id: crypto.randomUUID(), count: 0, imageUrl: null, ...parsed.data },
+      { status: 201, headers: { "x-cartly-client-storage": "true" } }
+    );
   }
 
   return NextResponse.json(

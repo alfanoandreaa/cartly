@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { demoCollections, demoProducts } from "@/lib/demo-data";
 import { limitsFor } from "@/lib/limits";
 import { prisma } from "@/lib/prisma";
 
@@ -11,11 +10,11 @@ export async function GET() {
   if (!process.env.DATABASE_URL || user.id === "demo-user") {
     return NextResponse.json({
       plan: user.plan,
-      productCount: demoProducts.length,
+      productCount: 0,
       maxProducts: limits.products,
-      collectionCount: demoCollections.length,
+      collectionCount: 0,
       maxCollections: Number.isFinite(limits.collections) ? limits.collections : null
-    });
+    }, { headers: { "x-cartly-client-storage": "true" } });
   }
 
   const [productCount, collectionCount] = await Promise.all([

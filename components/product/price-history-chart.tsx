@@ -4,6 +4,14 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { formatPrice } from "@/lib/utils";
 
 export function PriceHistoryChart({ data }: { data: { date: string; price: number }[] }) {
+  if (!data.length) {
+    return (
+      <div className="grid h-52 place-items-center rounded-2xl border border-dashed border-line text-center text-sm text-muted">
+        Price history will appear after Cartly completes its first checks.
+      </div>
+    );
+  }
+
   const prices = data.map((point) => point.price);
   const min = Math.min(...prices);
   const max = Math.max(...prices);

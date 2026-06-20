@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/track?cadence=all",
-      "schedule": "0 6 * * *"
-    }
-  ]
-}

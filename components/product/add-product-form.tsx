@@ -3,9 +3,17 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, ImageIcon, Link2, Loader2, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { UpgradeModal } from "@/components/layout/upgrade-modal";
 import { Button } from "@/components/ui/button";
+import type { CartlyCollection } from "@/lib/cartly-data";
+import { normalizeProduct } from "@/lib/cartly-data";
+import {
+  readLocalCollections,
+  readLocalPicks,
+  writeLocalPicks
+} from "@/lib/client-storage";
 
 type ScrapeResult = {
   title: string;
@@ -17,20 +25,45 @@ type ScrapeResult = {
 };
 
 export function AddProductForm() {
+  const { data: session, status } = useSession();
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<ScrapeResult | null>(null);
   const [upgrade, setUpgrade] = useState(false);
+  const [collections, setCollections] = useState<CartlyCollection[]>([]);
+  const [usesClientStorage, setUsesClientStorage] = useState(false);
+  const email = session?.user?.email;
 
   useEffect(() => {
-    fetch("/api/user/limits")
-      .then((response) => response.json())
-      .then((limits) => {
-        if (limits.productCount >= limits.maxProducts && limits.plan === "FREE") setUpgrade(true);
+    if (status === "loading") return;
+    Promise.all([
+      fetch("/api/user/limits", { cache: "no-store" }),
+      fetch("/api/collections", { cache: "no-store" })
+    ])
+      .then(async ([limitsResponse, collectionsResponse]) => {
+        const clientStorage = limitsResponse.headers.get("x-cartly-client-storage") === "true";
+        setUsesClientStorage(clientStorage);
+        const limits = await limitsResponse.json();
+
+        if (clientStorage) {
+          const picks = readLocalPicks(email);
+          setCollections(readLocalCollections(email));
+          if (limits.plan === "FREE" && picks.length >= limits.maxProducts) setUpgrade(true);
+        } else {
+          const collectionData = await collectionsResponse.json();
+          setCollections(
+            collectionData.map((collection: any) => ({
+              id: String(collection.id),
+              name: String(collection.name),
+              emoji: String(collection.emoji ?? "✨")
+            }))
+          );
+          if (limits.plan === "FREE" && limits.productCount >= limits.maxProducts) setUpgrade(true);
+        }
       })
       .catch(() => undefined);
-  }, []);
+  }, [email, status]);
 
   async function scrape() {
     if (!url) return;
@@ -57,22 +90,32 @@ export function AddProductForm() {
     if (!result) return;
     setSaving(true);
     const data = new FormData(event.currentTarget);
+    const priceValue = String(data.get("price") ?? "").trim();
+    const payload = {
+      url,
+      title: String(data.get("title") ?? ""),
+      imageUrl: String(data.get("imageUrl") ?? ""),
+      price: priceValue ? Number(priceValue) : null,
+      priceCurrency: result.currency,
+      siteName: result.siteName,
+      inStock: result.inStock,
+      personalNote: String(data.get("note") ?? ""),
+      priority: String(data.get("priority") ?? "MEDIUM"),
+      tags: [],
+      collectionId: String(data.get("collectionId") ?? "") || null
+    };
+
     try {
+      const existing = usesClientStorage ? readLocalPicks(email) : [];
+      if (usesClientStorage && session?.user?.plan !== "PRO" && existing.length >= 5) {
+        setUpgrade(true);
+        return;
+      }
+
       const response = await fetch("/api/products", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          url,
-          title: data.get("title"),
-          imageUrl: data.get("imageUrl"),
-          price: Number(data.get("price")),
-          priceCurrency: result.currency,
-          siteName: result.siteName,
-          inStock: result.inStock,
-          personalNote: data.get("note"),
-          priority: data.get("priority"),
-          collectionId: data.get("collectionId") || null
-        })
+        body: JSON.stringify(payload)
       });
       const body = await response.json();
       if (response.status === 403 && body.error === "LIMIT_REACHED") {
@@ -80,6 +123,22 @@ export function AddProductForm() {
         return;
       }
       if (!response.ok) throw new Error(body.error ?? "Could not save this pick");
+
+      if (usesClientStorage || response.headers.get("x-cartly-client-storage") === "true") {
+        const selectedCollection = collections.find((collection) => collection.id === payload.collectionId);
+        const product = normalizeProduct({
+          ...body,
+          collection: selectedCollection
+            ? {
+                id: selectedCollection.id,
+                name: selectedCollection.name,
+                emoji: selectedCollection.emoji
+              }
+            : null
+        });
+        writeLocalPicks(email, [product, ...existing]);
+      }
+
       toast.success("Saved to your Cartly");
       window.location.href = "/app/dashboard";
     } catch (caught) {
@@ -172,8 +231,11 @@ export function AddProductForm() {
               <span className="mb-2 block text-xs text-muted">Collection</span>
               <select name="collectionId" className="focus-ring h-12 w-full rounded-xl border border-line bg-card px-4 text-sm">
                 <option value="">No collection</option>
-                <option value="home">🏡 Dream home</option>
-                <option value="creative">📷 Creative kit</option>
+                {collections.map((collection) => (
+                  <option key={collection.id} value={collection.id}>
+                    {collection.emoji} {collection.name}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="block">

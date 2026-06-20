@@ -16,7 +16,10 @@ const updateSchema = z.object({
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (!process.env.DATABASE_URL || user.id === "demo-user") {
-    return NextResponse.json({ error: "Demo products are rendered by the app." }, { status: 404 });
+    return NextResponse.json(
+      { clientStorage: true },
+      { headers: { "x-cartly-client-storage": "true" } }
+    );
   }
   const product = await prisma.product.findFirst({
     where: { id: params.id, userId: user.id },
@@ -31,7 +34,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const user = await getCurrentUser();
   const parsed = updateSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: "Invalid product update." }, { status: 400 });
-  if (!process.env.DATABASE_URL || user.id === "demo-user") return NextResponse.json({ id: params.id, ...parsed.data });
+  if (!process.env.DATABASE_URL || user.id === "demo-user") {
+    return NextResponse.json(
+      { id: params.id, ...parsed.data },
+      { headers: { "x-cartly-client-storage": "true" } }
+    );
+  }
 
   const existing = await prisma.product.findFirst({ where: { id: params.id, userId: user.id }, select: { id: true } });
   if (!existing) return NextResponse.json({ error: "Pick not found." }, { status: 404 });
@@ -42,7 +50,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
 export async function DELETE(_: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
-  if (!process.env.DATABASE_URL || user.id === "demo-user") return new NextResponse(null, { status: 204 });
+  if (!process.env.DATABASE_URL || user.id === "demo-user") {
+    return new NextResponse(null, {
+      status: 204,
+      headers: { "x-cartly-client-storage": "true" }
+    });
+  }
 
   const result = await prisma.product.deleteMany({ where: { id: params.id, userId: user.id } });
   return result.count

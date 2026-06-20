@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   Bell,
   ChevronDown,
@@ -15,12 +16,17 @@ import {
   Sparkles,
   X
 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Logo } from "@/components/brand/logo";
 import { PlanBadge } from "@/components/layout/plan-badge";
 import { UpgradeModal } from "@/components/layout/upgrade-modal";
 import { Button } from "@/components/ui/button";
-import { demoCollections } from "@/lib/demo-data";
+import type { CartlyCollection } from "@/lib/cartly-data";
+import {
+  CARTLY_STORAGE_EVENT,
+  readLocalCollections,
+  readLocalPicks
+} from "@/lib/client-storage";
 import { cn } from "@/lib/utils";
 
 const mainLinks = [
@@ -30,17 +36,80 @@ const mainLinks = [
 ];
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
+  const { data: session, status } = useSession();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const productCount = 5;
-  const plan: "FREE" | "PRO" = "FREE";
+  const [productCount, setProductCount] = useState(0);
+  const [collections, setCollections] = useState<CartlyCollection[]>([]);
+  const plan = session?.user?.plan ?? "FREE";
+  const maxProducts = plan === "PRO" ? 20 : 5;
+  const usage = Math.min(100, (productCount / maxProducts) * 100);
+  const initials = (session?.user?.name || session?.user?.email || "Cartly user")
+    .split(/[\s@]+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+
+  const loadSidebarData = useCallback(async () => {
+    if (status === "loading") return;
+    try {
+      const [limitsResponse, collectionsResponse] = await Promise.all([
+        fetch("/api/user/limits", { cache: "no-store" }),
+        fetch("/api/collections", { cache: "no-store" })
+      ]);
+      if (!limitsResponse.ok || !collectionsResponse.ok) return;
+
+      const usesClientStorage = limitsResponse.headers.get("x-cartly-client-storage") === "true";
+      if (usesClientStorage) {
+        const localPicks = readLocalPicks(session?.user?.email);
+        const localCollections = readLocalCollections(session?.user?.email);
+        setProductCount(localPicks.length);
+        setCollections(
+          localCollections.map((collection) => ({
+            ...collection,
+            count: localPicks.filter((product) => product.collectionId === collection.id).length
+          }))
+        );
+        return;
+      }
+
+      const [limits, collectionData] = await Promise.all([
+        limitsResponse.json(),
+        collectionsResponse.json()
+      ]);
+      setProductCount(Number(limits.productCount ?? 0));
+      setCollections(
+        collectionData.map((collection: any) => ({
+          id: String(collection.id),
+          name: String(collection.name),
+          emoji: String(collection.emoji ?? "✨"),
+          count: Number(collection._count?.products ?? 0)
+        }))
+      );
+    } catch {
+      // Main screens own visible errors. The shell stays quiet if a summary request fails.
+    }
+  }, [session?.user?.email, status]);
+
+  useEffect(() => {
+    loadSidebarData();
+  }, [loadSidebarData, pathname]);
+
+  useEffect(() => {
+    window.addEventListener(CARTLY_STORAGE_EVENT, loadSidebarData);
+    window.addEventListener("storage", loadSidebarData);
+    return () => {
+      window.removeEventListener(CARTLY_STORAGE_EVENT, loadSidebarData);
+      window.removeEventListener("storage", loadSidebarData);
+    };
+  }, [loadSidebarData]);
 
   const sidebar = (
     <aside className="flex h-full flex-col bg-[#141414]">
       <div className="flex h-16 items-center justify-between px-5">
         <Logo href="/app/dashboard" />
-        <button className="text-muted lg:hidden" onClick={() => setMobileOpen(false)}>
+        <button className="text-muted lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Close menu">
           <X className="h-5 w-5" />
         </button>
       </div>
@@ -74,10 +143,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <div className="mt-7 px-5">
         <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-[.16em] text-muted">
           <span>Your collections</span>
-          <Plus className="h-3.5 w-3.5" />
+          <Link href="/app/dashboard/collections" aria-label="Manage collections">
+            <Plus className="h-3.5 w-3.5" />
+          </Link>
         </div>
         <div className="mt-3 space-y-1">
-          {demoCollections.map((collection) => (
+          {collections.map((collection) => (
             <Link
               href="/app/dashboard/collections"
               key={collection.id}
@@ -85,24 +156,38 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             >
               <span>{collection.emoji}</span>
               <span className="truncate">{collection.name}</span>
-              <span className="ml-auto text-xs">{collection.count}</span>
+              <span className="ml-auto text-xs">{collection.count ?? 0}</span>
             </Link>
           ))}
+          {collections.length === 0 && (
+            <p className="px-1 py-2 text-xs leading-relaxed text-muted/70">No collections yet.</p>
+          )}
         </div>
       </div>
       <div className="mt-auto p-4">
         <div className="rounded-2xl border border-line bg-card p-4">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold">Picks used</span>
-            <span className="text-xs text-muted">{productCount}/5</span>
+            <span className="text-xs text-muted">{productCount}/{maxProducts}</span>
           </div>
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full w-full rounded-full bg-gradient-to-r from-lime to-[#7ee787]" />
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-lime to-[#7ee787] transition-[width]"
+              style={{ width: `${usage}%` }}
+            />
           </div>
-          <p className="mt-3 text-xs leading-relaxed text-muted">Your free wishlist is full.</p>
-          <button onClick={() => setUpgradeOpen(true)} className="mt-3 text-xs font-semibold text-lime hover:underline">
-            Upgrade to Cartly Pro →
-          </button>
+          <p className="mt-3 text-xs leading-relaxed text-muted">
+            {productCount >= maxProducts
+              ? plan === "FREE"
+                ? "Your free wishlist is full."
+                : "You’ve reached the suggested Cartly Pro limit."
+              : `${maxProducts - productCount} ${maxProducts - productCount === 1 ? "pick" : "picks"} available.`}
+          </p>
+          {plan === "FREE" && (
+            <button onClick={() => setUpgradeOpen(true)} className="mt-3 text-xs font-semibold text-lime hover:underline">
+              Upgrade to Cartly Pro →
+            </button>
+          )}
         </div>
         <Link
           href="/app/dashboard/settings"
@@ -125,7 +210,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       )}
       <div className="lg:pl-64">
         <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-line bg-ink/85 px-4 backdrop-blur-xl sm:px-6">
-          <button className="grid h-10 w-10 place-items-center rounded-xl text-muted lg:hidden" onClick={() => setMobileOpen(true)}>
+          <button className="grid h-10 w-10 place-items-center rounded-xl text-muted lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu">
             <Menu className="h-5 w-5" />
           </button>
           <div className="relative hidden max-w-lg flex-1 sm:block">
@@ -137,16 +222,17 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="ml-auto flex items-center gap-2">
             <PlanBadge plan={plan} />
-            <Button variant="secondary" size="sm" className="hidden sm:inline-flex" onClick={() => setUpgradeOpen(true)}>
-              <Sparkles className="h-4 w-4 text-lime" /> Upgrade
-            </Button>
-            <button className="relative grid h-10 w-10 place-items-center rounded-xl text-muted transition hover:bg-white/5 hover:text-white">
+            {plan === "FREE" && (
+              <Button variant="secondary" size="sm" className="hidden sm:inline-flex" onClick={() => setUpgradeOpen(true)}>
+                <Sparkles className="h-4 w-4 text-lime" /> Upgrade
+              </Button>
+            )}
+            <button className="relative grid h-10 w-10 place-items-center rounded-xl text-muted transition hover:bg-white/5 hover:text-white" aria-label="Notifications">
               <Bell className="h-[18px] w-[18px]" />
-              <span className="absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full bg-coral" />
             </button>
-            <button className="flex h-10 items-center gap-2 rounded-xl pl-1 pr-2 transition hover:bg-white/5">
+            <button className="flex h-10 items-center gap-2 rounded-xl pl-1 pr-2 transition hover:bg-white/5" aria-label="Account menu">
               <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-lime to-emerald-500 text-xs font-bold text-ink">
-                AM
+                {initials || "CU"}
               </span>
               <ChevronDown className="hidden h-3.5 w-3.5 text-muted sm:block" />
             </button>

@@ -666,12 +666,13 @@ export async function scrapeProduct(input: string, report?: ProgressReporter): P
     // Fall through to HTML scraping.
   }
 
-  // Step 2: fetch the page HTML (with JS rendering for browser-heavy stores).
-  const rendered = Boolean(SCRAPER_API_KEY) && adapter.browserPreferred === true;
+  // Step 2: fetch the page HTML. When ScraperAPI is active we always start
+  // without JS rendering (their proxy already bypasses most blocks); rendering
+  // is only used as a fallback when the plain fetch yields no price.
   let initialHtml = "";
   let finalUrl = url;
   try {
-    const fetched = await fetchHtml(url, report, rendered);
+    const fetched = await fetchHtml(url, report, false);
     initialHtml = fetched.html;
     finalUrl = fetched.finalUrl;
     adapter = detectStore(finalUrl);
@@ -701,27 +702,25 @@ export async function scrapeProduct(input: string, report?: ProgressReporter): P
     }
   }
 
-  // Step 3: render JavaScript and retry — unless we already rendered above.
-  if (!(rendered && initialHtml)) {
-    try {
-      const renderedHtml = SCRAPER_API_KEY
-        ? (await fetchHtml(finalUrl, report, true)).html
-        : await fetchRenderedHtml(finalUrl, adapter, report);
-      const renderedPrice = extractPriceByHierarchy(renderedHtml, finalUrl, adapter);
-      const result = extractMetadata(renderedHtml, finalUrl, adapter, renderedPrice);
-      await report?.({
-        stage: "complete",
-        progress: 100,
-        message: renderedPrice
-          ? `${result.siteName} product details ready`
-          : "Price not detected — enter it manually",
-        storeName: result.siteName,
-        storeKey: adapter.key
-      });
-      return result;
-    } catch {
-      // Fall through to the manual-entry result below.
-    }
+  // Step 3: retry with JS rendering for stores that load prices dynamically.
+  try {
+    const renderedHtml = SCRAPER_API_KEY
+      ? (await fetchHtml(finalUrl, report, true)).html
+      : await fetchRenderedHtml(finalUrl, adapter, report);
+    const renderedPrice = extractPriceByHierarchy(renderedHtml, finalUrl, adapter);
+    const result = extractMetadata(renderedHtml, finalUrl, adapter, renderedPrice);
+    await report?.({
+      stage: "complete",
+      progress: 100,
+      message: renderedPrice
+        ? `${result.siteName} product details ready`
+        : "Price not detected — enter it manually",
+      storeName: result.siteName,
+      storeKey: adapter.key
+    });
+    return result;
+  } catch {
+    // Fall through to the manual-entry result below.
   }
 
   // Nothing worked — return whatever metadata we have for manual completion.

@@ -24,6 +24,7 @@ type ScrapeResult = {
   inStock: boolean;
   storeKey?: string;
   extractionMethod?: "store-adapter" | "structured-data" | "universal";
+  priceConfidence?: "high" | "medium" | "low";
 };
 
 type ScrapeStatus = {
@@ -174,6 +175,8 @@ export function AddProductForm() {
         collected.price === null ? "price" : null,
         !collected.imageUrl ? "image" : null
       ].filter(Boolean);
+      const priceNeedsReview =
+        collected.price !== null && collected.priceConfidence === "low";
       setUrl(normalizedUrl);
       setResult(collected);
       lastScrapedUrl.current = normalizedUrl;
@@ -182,11 +185,13 @@ export function AddProductForm() {
         progress: 100,
         message: missing.length
           ? `Details collected. Please review the ${missing.join(", ")}.`
+          : priceNeedsReview
+            ? "Product found. Please double-check the price before saving."
           : "Title, price, and image collected successfully.",
         storeName: collected.siteName,
         storeKey: collected.storeKey
       });
-      if (missing.length) toast.warning("Product found — a few details need your review");
+      if (missing.length || priceNeedsReview) toast.warning("Product found — a few details need your review");
       else toast.success("Product details collected automatically");
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === "AbortError") return;
@@ -421,7 +426,22 @@ export function AddProductForm() {
             </label>
             <div className="grid grid-cols-2 gap-4">
               <label>
-                <span className="mb-2 block text-xs text-muted">Price ({result.currency})</span>
+                <span className="mb-2 flex items-center justify-between text-xs text-muted">
+                  Price ({result.currency})
+                  {result.priceConfidence && (
+                    <span
+                      className={
+                        result.priceConfidence === "high"
+                          ? "text-lime"
+                          : result.priceConfidence === "medium"
+                            ? "text-[#FFD166]"
+                            : "text-coral"
+                      }
+                    >
+                      {result.priceConfidence} confidence
+                    </span>
+                  )}
+                </span>
                 <input name="price" type="number" step="0.01" defaultValue={result.price ?? ""} className="focus-ring h-12 w-full rounded-xl border border-line bg-card px-4 text-sm" />
               </label>
               <label>

@@ -17,6 +17,7 @@ export type ScrapedProduct = {
   inStock: boolean;
   storeKey: StoreKey;
   extractionMethod: "store-adapter" | "structured-data" | "universal";
+  priceConfidence: "high" | "medium" | "low";
 };
 
 export type ScrapeProgress = {
@@ -67,6 +68,26 @@ export function normalizePrice(value?: string | number | null) {
   return Number.isFinite(result) ? result : null;
 }
 
+type PriceCandidate = {
+  value: number;
+  currency: string | null;
+  score: number;
+  source: string;
+  context: string;
+};
+
+const PRICE_TOKEN =
+  /-?\d{1,3}(?:[.\s]\d{3})+(?:,\d{1,2})?|-?\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|-?\d+(?:[.,]\d{1,2})?/g;
+
+function priceTokens(value: string) {
+  return Array.from(value.replace(/\u00a0/g, " ").matchAll(PRICE_TOKEN))
+    .map((match) => ({
+      raw: match[0],
+      index: match.index ?? 0
+    }))
+    .filter(({ raw }) => raw.length > 0);
+}
+
 function inferCurrency(value?: string | null) {
   if (!value) return null;
   const upper = value.toUpperCase();
@@ -79,6 +100,229 @@ function inferCurrency(value?: string | null) {
   if (upper.includes("CHF")) return "CHF";
   if (upper.includes("PLN") || upper.includes("ZŁ")) return "PLN";
   return null;
+}
+
+function candidatePenalty(context: string, tokenIndex: number, tokenLength: number) {
+  const lower = context.toLowerCase();
+  const left = lower.slice(Math.max(0, tokenIndex - 30), tokenIndex);
+  const right = lower.slice(tokenIndex + tokenLength, tokenIndex + tokenLength + 30);
+  const nearby = `${left} ${right}`;
+  let score = 0;
+
+  if (/^\s*%/.test(right)) score -= 140;
+  if (
+    /\b(save|discount|coupon|promo|off|sconto|risparmia)\b/i.test(nearby) &&
+    !inferCurrency(nearby)
+  ) {
+    score -= 48;
+  }
+  if (/\b(was|before|original|list price|rrp|msrp|retail|prezzo precedente|anzich[eé])\b/i.test(left)) score -= 45;
+  if (
+    /\b(month|monthly|installment|payment|rate|rata|mese|klarna|afterpay)\b/i.test(left) ||
+    /^\s*(\/|per\s+)?(month|mese)\b/i.test(right) ||
+    /^\s*(payments?|rate)\b/i.test(right)
+  ) {
+    score -= 52;
+  }
+  if (/\b(shipping|delivery|spedizione|consegna)\b/i.test(left)) score -= 65;
+  if (/\b(current|now|sale price|our price|your price|oggi|ora|prezzo attuale)\b/i.test(left)) score += 18;
+  if (inferCurrency(nearby)) score += 12;
+
+  return score;
+}
+
+function candidatesFromText(
+  text: string,
+  score: number,
+  source: string,
+  explicitCurrency?: string | null
+): PriceCandidate[] {
+  const context = cleanText(text);
+  if (!context) return [];
+
+  return priceTokens(context)
+    .map(({ raw, index }) => {
+      const value = normalizePrice(raw);
+      if (value === null || value <= 0 || value > 100_000_000) return null;
+      const nearby = context.slice(Math.max(0, index - 24), index + raw.length + 24);
+      return {
+        value,
+        currency: inferCurrency(nearby) || inferCurrency(context) || explicitCurrency || null,
+        score: score + candidatePenalty(context, index, raw.length),
+        source,
+        context
+      } satisfies PriceCandidate;
+    })
+    .filter((candidate): candidate is PriceCandidate => candidate !== null);
+}
+
+function elementPriceValues(element: cheerio.Cheerio<any>) {
+  const values = [
+    element.attr("content"),
+    element.attr("value"),
+    element.attr("data-price"),
+    element.attr("data-product-price"),
+    element.attr("data-sale-price"),
+    element.attr("aria-label"),
+    element.text()
+  ];
+  return Array.from(new Set(values.map(cleanText).filter(Boolean)));
+}
+
+function candidatesFromSelectors(
+  $: cheerio.CheerioAPI,
+  selectors: string[],
+  baseScore: number,
+  sourcePrefix: string,
+  currency?: string | null
+) {
+  const candidates: PriceCandidate[] = [];
+  selectors.forEach((selector, selectorIndex) => {
+    $(selector)
+      .slice(0, 10)
+      .each((_, node) => {
+        const element = $(node);
+        elementPriceValues(element).forEach((value, valueIndex) => {
+          candidates.push(
+            ...candidatesFromText(
+              value,
+              baseScore - selectorIndex * 3 - valueIndex,
+              `${sourcePrefix}:${selector}`,
+              currency
+            )
+          );
+        });
+      });
+  });
+  return candidates;
+}
+
+function candidatesFromEmbeddedJson(
+  html: string,
+  keys: string[] = [],
+  explicitCurrency?: string | null
+) {
+  const candidates: PriceCandidate[] = [];
+  keys.forEach((key, keyIndex) => {
+    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(
+      `"${escaped}"\\s*:\\s*(?:"((?:\\\\.|[^"])*)"|(-?\\d+(?:\\.\\d+)?))`,
+      "gi"
+    );
+    for (const match of Array.from(html.matchAll(regex))) {
+      const value = cleanText(match[1] ? decodeEmbeddedString(match[1]) : match[2]);
+      const keyLower = key.toLowerCase();
+      let score = 103 - keyIndex * 2;
+      if (/sale|current|activity|final|offer/.test(keyLower)) score += 18;
+      if (/min/.test(keyLower)) score += 8;
+      if (/original|retail|list|regular|was/.test(keyLower)) score -= 35;
+      candidates.push(
+        ...candidatesFromText(value, score, `embedded:${key}`, explicitCurrency)
+      );
+    }
+  });
+  return candidates;
+}
+
+function splitPriceCandidates(
+  $: cheerio.CheerioAPI,
+  adapter: StoreAdapter,
+  currency?: string | null
+) {
+  const candidates: PriceCandidate[] = [];
+
+  if (adapter.key === "amazon") {
+    $(".a-price").slice(0, 8).each((_, node) => {
+      const element = $(node);
+      const accessible = cleanText(element.find(".a-offscreen").first().text());
+      if (accessible) {
+        candidates.push(...candidatesFromText(accessible, 148, "amazon:offscreen", currency));
+        return;
+      }
+      const whole = cleanText(element.find(".a-price-whole").first().text()).replace(/[^\d.,]/g, "");
+      const fraction = cleanText(element.find(".a-price-fraction").first().text()).replace(/\D/g, "");
+      if (whole) {
+        const combined = fraction
+          ? `${whole.replace(/\D/g, "")}.${fraction.padEnd(2, "0").slice(0, 2)}`
+          : whole;
+        candidates.push(...candidatesFromText(combined, 144, "amazon:split", currency));
+      }
+    });
+  }
+
+  if (adapter.key === "ikea") {
+    $('[class*="price"]').slice(0, 8).each((_, node) => {
+      const element = $(node);
+      const integer = cleanText(element.find('[class*="integer"]').first().text()).replace(/\D/g, "");
+      const decimal = cleanText(element.find('[class*="decimal"]').first().text()).replace(/\D/g, "");
+      if (integer) {
+        candidates.push(
+          ...candidatesFromText(
+            decimal ? `${integer}.${decimal.padEnd(2, "0").slice(0, 2)}` : integer,
+            138,
+            "ikea:split",
+            currency
+          )
+        );
+      }
+    });
+  }
+
+  return candidates;
+}
+
+function choosePrice(candidates: PriceCandidate[]) {
+  if (!candidates.length) {
+    return {
+      price: null,
+      currency: null,
+      confidence: "low" as const
+    };
+  }
+
+  const frequencies = new Map<string, number>();
+  candidates.forEach((candidate) => {
+    const key = candidate.value.toFixed(2);
+    frequencies.set(key, (frequencies.get(key) ?? 0) + 1);
+  });
+
+  const ranked = candidates
+    .map((candidate) => ({
+      ...candidate,
+      finalScore:
+        candidate.score +
+        Math.min(16, Math.max(0, (frequencies.get(candidate.value.toFixed(2)) ?? 1) - 1) * 4)
+    }))
+    .filter((candidate) => candidate.finalScore > 20)
+    .sort((a, b) => b.finalScore - a.finalScore || a.value - b.value);
+
+  const winner = ranked[0];
+  if (!winner) {
+    return {
+      price: null,
+      currency: null,
+      confidence: "low" as const
+    };
+  }
+
+  const runnerUp = ranked.find((candidate) => candidate.value !== winner.value);
+  const margin = runnerUp ? winner.finalScore - runnerUp.finalScore : 30;
+  const sameRange =
+    Boolean(runnerUp) &&
+    runnerUp?.source === winner.source &&
+    runnerUp?.context === winner.context;
+  const confidence: ScrapedProduct["priceConfidence"] =
+    winner.finalScore >= 125 && margin >= 8
+      ? "high"
+      : winner.finalScore >= 95 && (margin >= 2 || sameRange)
+        ? "medium"
+        : "low";
+
+  return {
+    price: winner.value,
+    currency: winner.currency,
+    confidence
+  };
 }
 
 function cleanText(value?: string | null) {
@@ -227,7 +471,12 @@ export function extractMetadata(
 ): ScrapedProduct {
   const $ = cheerio.load(html);
   const json = readProductJsonLd($);
-  const offers = Array.isArray(json?.offers) ? json.offers[0] : json?.offers;
+  const offerList = Array.isArray(json?.offers)
+    ? json.offers
+    : json?.offers
+      ? [json.offers]
+      : [];
+  const offers = offerList[0];
   const priceSpecification = Array.isArray(offers?.priceSpecification)
     ? offers.priceSpecification[0]
     : offers?.priceSpecification;
@@ -240,25 +489,20 @@ export function extractMetadata(
   const adapterTitle =
     firstText($, adapter.titleSelectors) ||
     embeddedValue(html, adapter.embeddedTitleKeys);
-  const adapterPriceText =
-    firstText($, adapter.priceSelectors) ||
-    embeddedValue(html, adapter.embeddedPriceKeys);
   const adapterImage =
     firstImage($, adapter.imageSelectors) ||
     embeddedValue(html, adapter.embeddedImageKeys);
   const adapterCurrency = firstText($, adapter.currencySelectors ?? []);
 
   const structuredTitle = cleanText(String(json?.name ?? ""));
-  const structuredPrice =
-    offers?.price ??
-    offers?.lowPrice ??
-    priceSpecification?.price ??
-    null;
-  const universalPriceText = firstText($, [
+  const universalPriceSelectors = [
     'meta[property="product:price:amount"]',
     'meta[name="price"]',
-    '[itemprop="price"]'
-  ]);
+    '[itemprop="price"]',
+    '[data-testid*="price"]',
+    '[data-test*="price"]',
+    '[class~="price"]'
+  ];
   const title =
     adapterTitle ||
     structuredTitle ||
@@ -273,9 +517,12 @@ export function extractMetadata(
       'meta[property="og:image"]',
       'meta[name="twitter:image"]'
     ]);
-  const price = normalizePrice(adapterPriceText || structuredPrice || universalPriceText);
+  const visiblePriceText = firstText($, [
+    ...adapter.priceSelectors,
+    ...universalPriceSelectors
+  ]);
   const hostname = new URL(sourceUrl).hostname.toLowerCase();
-  const currency =
+  const pageCurrency =
     inferCurrency(adapterCurrency) ||
     cleanText(
       String(
@@ -286,9 +533,61 @@ export function extractMetadata(
           ""
       )
     ).toUpperCase() ||
-    inferCurrency(adapterPriceText || universalPriceText) ||
+    inferCurrency(visiblePriceText) ||
     adapter.defaultCurrency?.(hostname) ||
     "EUR";
+
+  const priceCandidates: PriceCandidate[] = [
+    ...splitPriceCandidates($, adapter, pageCurrency),
+    ...candidatesFromSelectors(
+      $,
+      adapter.priceSelectors,
+      adapter.key === "generic" ? 96 : 132,
+      adapter.key,
+      pageCurrency
+    ),
+    ...candidatesFromEmbeddedJson(
+      html,
+      adapter.embeddedPriceKeys,
+      pageCurrency
+    ),
+    ...candidatesFromSelectors(
+      $,
+      universalPriceSelectors,
+      112,
+      "semantic",
+      pageCurrency
+    )
+  ];
+
+  offerList.slice(0, 12).forEach((offer: Record<string, any>, offerIndex: number) => {
+    const specification = Array.isArray(offer?.priceSpecification)
+      ? offer.priceSpecification[0]
+      : offer?.priceSpecification;
+    const structuredValues: Array<[unknown, number, string]> = [
+      [offer?.price, 142 - offerIndex, "jsonld:offer-price"],
+      [offer?.lowPrice, 136 - offerIndex, "jsonld:low-price"],
+      [offer?.highPrice, 112 - offerIndex, "jsonld:high-price"],
+      [specification?.price, 132 - offerIndex, "jsonld:price-specification"]
+    ];
+    structuredValues.forEach(([value, score, source]) => {
+      if (value !== null && value !== undefined) {
+        priceCandidates.push(
+          ...candidatesFromText(
+            String(value),
+            score,
+            source,
+            cleanText(String(offer?.priceCurrency ?? specification?.priceCurrency ?? "")) ||
+              pageCurrency
+          )
+        );
+      }
+    });
+  });
+
+  const chosenPrice = choosePrice(priceCandidates);
+  const price = chosenPrice.price;
+  const currency = chosenPrice.currency || pageCurrency;
 
   const availabilityText = [
     String(offers?.availability ?? ""),
@@ -305,7 +604,12 @@ export function extractMetadata(
         hostname.replace(/^www\./, "").split(".")[0]
       : adapter.name;
   const usedAdapter =
-    adapter.key !== "generic" && Boolean(adapterTitle || adapterPriceText || adapterImage);
+    adapter.key !== "generic" &&
+    Boolean(
+      adapterTitle ||
+      adapterImage ||
+      priceCandidates.some((candidate) => candidate.source.startsWith(`${adapter.key}:`))
+    );
 
   return {
     title: title.slice(0, 240),
@@ -321,7 +625,8 @@ export function extractMetadata(
       ? "store-adapter"
       : json
         ? "structured-data"
-        : "universal"
+        : "universal",
+    priceConfidence: chosenPrice.confidence
   };
 }
 
@@ -453,7 +758,7 @@ export async function scrapeProduct(
   const initial = extractMetadata(fetched.html, fetched.finalUrl, adapter);
   const detectedStoreName = adapter.key === "generic" ? initial.siteName : adapter.name;
 
-  if (complete(initial)) {
+  if (complete(initial) && !adapter.browserPreferred) {
     await report?.({
       stage: "complete",
       progress: 100,

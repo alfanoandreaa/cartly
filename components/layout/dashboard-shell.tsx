@@ -43,7 +43,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [productCount, setProductCount] = useState(0);
   const [collections, setCollections] = useState<CartlyCollection[]>([]);
   const plan = session?.user?.plan ?? "FREE";
-  const maxProducts = plan === "PRO" ? 20 : 5;
+  const maxProducts = plan === "PRO" ? 20 : 10;
   const usage = Math.min(100, (productCount / maxProducts) * 100);
   const initials = (session?.user?.name || session?.user?.email || "Cartly user")
     .split(/[\s@]+/)

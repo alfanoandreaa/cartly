@@ -231,7 +231,7 @@ export function AddProductForm() {
 
     try {
       const existing = usesClientStorage ? readLocalPicks(email) : [];
-      if (usesClientStorage && session?.user?.plan !== "PRO" && existing.length >= 5) {
+      if (usesClientStorage && session?.user?.plan !== "PRO" && existing.length >= 10) {
         setUpgrade(true);
         return;
       }

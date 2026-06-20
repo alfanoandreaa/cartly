@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ArrowLeft, ImageIcon, Link2, Loader2, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowLeft, Check, ImageIcon, Link2, Loader2, RefreshCw, Sparkles, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
@@ -24,6 +24,30 @@ type ScrapeResult = {
   inStock: boolean;
 };
 
+type ScrapeStatus = {
+  stage: "idle" | "validating" | "connecting" | "reading" | "extracting" | "browser" | "complete" | "error";
+  progress: number;
+  message: string;
+};
+
+const initialScrapeStatus: ScrapeStatus = {
+  stage: "idle",
+  progress: 0,
+  message: "Paste a product link and Cartly will collect the details automatically."
+};
+
+function normalizeProductUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const parsed = new URL(candidate);
+    return ["http:", "https:"].includes(parsed.protocol) ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 export function AddProductForm() {
   const { data: session, status } = useSession();
   const [url, setUrl] = useState("");
@@ -33,6 +57,9 @@ export function AddProductForm() {
   const [upgrade, setUpgrade] = useState(false);
   const [collections, setCollections] = useState<CartlyCollection[]>([]);
   const [usesClientStorage, setUsesClientStorage] = useState(false);
+  const [scrapeStatus, setScrapeStatus] = useState<ScrapeStatus>(initialScrapeStatus);
+  const lastScrapedUrl = useRef("");
+  const scrapeController = useRef<AbortController | null>(null);
   const email = session?.user?.email;
 
   useEffect(() => {
@@ -65,25 +92,122 @@ export function AddProductForm() {
       .catch(() => undefined);
   }, [email, status]);
 
-  async function scrape() {
-    if (!url) return;
+  const scrape = useCallback(async (requestedUrl: string, force = false) => {
+    const normalizedUrl = normalizeProductUrl(requestedUrl);
+    if (!normalizedUrl) {
+      setScrapeStatus({
+        stage: "error",
+        progress: 100,
+        message: "Enter a complete product link to continue."
+      });
+      return;
+    }
+    if (!force && lastScrapedUrl.current === normalizedUrl) return;
+
+    scrapeController.current?.abort();
+    const controller = new AbortController();
+    scrapeController.current = controller;
+    lastScrapedUrl.current = normalizedUrl;
     setLoading(true);
+    setResult(null);
+    setScrapeStatus({
+      stage: "validating",
+      progress: 8,
+      message: "Checking the product link…"
+    });
+
     try {
       const response = await fetch("/api/scrape", {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url })
+        headers: {
+          "content-type": "application/json",
+          accept: "application/x-ndjson"
+        },
+        body: JSON.stringify({ url: normalizedUrl }),
+        signal: controller.signal
       });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "We couldn’t read that product page.");
-      setResult(body);
-      toast.success("Product details found");
+      if (!response.ok) {
+        const body = await response.json();
+        throw new Error(body.error ?? "We couldn’t read that product page.");
+      }
+      if (!response.body) throw new Error("The store did not return any product data.");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let collected: ScrapeResult | null = null;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value, { stream: !done });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const event = JSON.parse(line);
+          if (event.type === "progress") {
+            setScrapeStatus({
+              stage: event.stage,
+              progress: Number(event.progress),
+              message: String(event.message)
+            });
+          } else if (event.type === "result") {
+            collected = event.product as ScrapeResult;
+          } else if (event.type === "error") {
+            throw new Error(String(event.error));
+          }
+        }
+        if (done) break;
+      }
+
+      if (!collected) throw new Error("Cartly couldn’t find product details on that page.");
+
+      const missing = [
+        collected.title === "Untitled pick" ? "title" : null,
+        collected.price === null ? "price" : null,
+        !collected.imageUrl ? "image" : null
+      ].filter(Boolean);
+      setUrl(normalizedUrl);
+      setResult(collected);
+      lastScrapedUrl.current = normalizedUrl;
+      setScrapeStatus({
+        stage: "complete",
+        progress: 100,
+        message: missing.length
+          ? `Details collected. Please review the ${missing.join(", ")}.`
+          : "Title, price, and image collected successfully."
+      });
+      if (missing.length) toast.warning("Product found — a few details need your review");
+      else toast.success("Product details collected automatically");
     } catch (caught) {
+      if (caught instanceof DOMException && caught.name === "AbortError") return;
+      setScrapeStatus({
+        stage: "error",
+        progress: 100,
+        message: caught instanceof Error ? caught.message : "Could not collect product details."
+      });
       toast.error(caught instanceof Error ? caught.message : "Could not scrape that URL");
     } finally {
-      setLoading(false);
+      if (scrapeController.current === controller) {
+        setLoading(false);
+        scrapeController.current = null;
+      }
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    const normalizedUrl = normalizeProductUrl(url);
+    if (!normalizedUrl || normalizedUrl === lastScrapedUrl.current || loading) return;
+    const timer = window.setTimeout(() => {
+      scrape(normalizedUrl);
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [loading, scrape, url]);
+
+  useEffect(() => {
+    return () => scrapeController.current?.abort();
+  }, []);
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -166,18 +290,76 @@ export function AddProductForm() {
             <Link2 className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <input
               value={url}
-              onChange={(event) => setUrl(event.target.value)}
+              onChange={(event) => {
+                const nextUrl = event.target.value;
+                setUrl(nextUrl);
+                if (normalizeProductUrl(nextUrl) !== lastScrapedUrl.current) {
+                  scrapeController.current?.abort();
+                  setLoading(false);
+                  setResult(null);
+                  setScrapeStatus(initialScrapeStatus);
+                }
+              }}
               type="url"
               placeholder="https://store.com/the-perfect-thing"
               className="focus-ring h-12 w-full rounded-xl border border-line bg-card pl-11 pr-4 text-sm"
             />
           </div>
-          <Button size="lg" onClick={scrape} disabled={!url || loading}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {loading ? "Reading page…" : "Get details"}
+          <Button size="lg" onClick={() => scrape(url, true)} disabled={!url || loading}>
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : result || scrapeStatus.stage === "error" ? (
+              <RefreshCw className="h-4 w-4" />
+            ) : (
+              <Sparkles className="h-4 w-4" />
+            )}
+            {loading ? "Collecting…" : result ? "Refresh details" : scrapeStatus.stage === "error" ? "Try again" : "Get details"}
           </Button>
         </div>
-        <p className="mt-3 text-xs text-muted">Cartly only reads public product information. Your URL stays private.</p>
+        <div className="mt-4 rounded-xl border border-line bg-ink/50 p-3">
+          <div className="flex items-center gap-2">
+            <span
+              className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ${
+                scrapeStatus.stage === "complete"
+                  ? "bg-lime text-ink"
+                  : scrapeStatus.stage === "error"
+                    ? "bg-coral/15 text-coral"
+                    : "bg-white/5 text-muted"
+              }`}
+            >
+              {scrapeStatus.stage === "complete" ? (
+                <Check className="h-3.5 w-3.5" />
+              ) : scrapeStatus.stage === "error" ? (
+                <TriangleAlert className="h-3.5 w-3.5" />
+              ) : loading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Link2 className="h-3.5 w-3.5" />
+              )}
+            </span>
+            <p
+              className={`min-w-0 flex-1 truncate text-xs ${
+                scrapeStatus.stage === "error" ? "text-coral" : scrapeStatus.stage === "complete" ? "text-white" : "text-muted"
+              }`}
+            >
+              {scrapeStatus.message}
+            </p>
+            <span className="text-[10px] tabular-nums text-muted">
+              {scrapeStatus.stage === "idle" ? "AUTO" : `${scrapeStatus.progress}%`}
+            </span>
+          </div>
+          <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-white/10">
+            <div
+              className={`h-full rounded-full transition-[width,background-color] duration-500 ${
+                scrapeStatus.stage === "error" ? "bg-coral" : "bg-lime"
+              }`}
+              style={{ width: `${scrapeStatus.progress}%` }}
+            />
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-muted">
+          Collection starts automatically after you paste a valid link. Cartly only reads public product information.
+        </p>
       </div>
 
       {loading && (

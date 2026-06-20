@@ -1,0 +1,52 @@
+{
+  "name": "cartly",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "5.22.0",
+    "@radix-ui/react-slot": "1.1.1",
+    "@sparticuz/chromium": "131.0.1",
+    "bcryptjs": "2.4.3",
+    "cheerio": "1.0.0",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "framer-motion": "11.18.2",
+    "lucide-react": "0.468.0",
+    "nanoid": "5.0.9",
+    "next": "14.2.35",
+    "next-auth": "4.24.11",
+    "puppeteer-core": "23.11.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "recharts": "2.15.0",
+    "sonner": "1.7.1",
+    "stripe": "17.5.0",
+    "tailwind-merge": "2.6.0",
+    "zod": "3.24.1"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "2.4.6",
+    "@types/node": "20.17.12",
+    "@types/react": "18.3.18",
+    "@types/react-dom": "18.3.5",
+    "autoprefixer": "10.4.20",
+    "postcss": "8.4.49",
+    "prisma": "5.22.0",
+    "tailwindcss": "3.4.17",
+    "tsx": "4.19.2",
+    "typescript": "5.7.2"
+  }
+}

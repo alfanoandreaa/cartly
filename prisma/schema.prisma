@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Plan {
+  FREE
+  PRO
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ShareType {
+  PRODUCT
+  COLLECTION
+}
+
+enum DiscoverCategory {
+  FASHION
+  HOME
+  BEAUTY
+  TECH
+  BOOKS
+  FOOD
+  OTHER
+}
+
+enum NotificationType {
+  PRICE_DROP
+  BACK_IN_STOCK
+  OUT_OF_STOCK
+  SYSTEM
+}
+
+model User {
+  id                   String       @id @default(cuid())
+  email                String       @unique
+  passwordHash         String?
+  name                 String?
+  image                String?
+  plan                 Plan         @default(FREE)
+  stripeCustomerId     String?      @unique
+  stripeSubscriptionId String?      @unique
+  subscriptionStatus   String?
+  subscriptionEnd      DateTime?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  products             Product[]
+  collections          Collection[]
+  priceAlerts          PriceAlert[]
+  sharedLinks          SharedLink[]
+  notifications        Notification[]
+}
+
+model Product {
+  id             String       @id @default(cuid())
+  userId         String
+  collectionId   String?
+  url            String
+  title          String
+  imageUrl       String?
+  siteName       String?
+  price          Decimal?     @db.Decimal(12, 2)
+  priceCurrency  String       @default("EUR")
+  priceHistory   Json         @default("[]")
+  inStock        Boolean      @default(true)
+  lastCheckedAt  DateTime?
+  personalNote   String?      @db.VarChar(500)
+  priority       Priority     @default(MEDIUM)
+  tags           String[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collection     Collection?  @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+  alerts         PriceAlert[]
+
+  @@index([userId])
+  @@index([collectionId])
+}
+
+model Collection {
+  id        String    @id @default(cuid())
+  userId    String
+  name      String
+  emoji     String    @default("✨")
+  isPublic  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  products  Product[]
+
+  @@index([userId])
+}
+
+model PriceAlert {
+  id          String    @id @default(cuid())
+  userId      String
+  productId   String
+  targetPrice Decimal   @db.Decimal(12, 2)
+  isActive    Boolean   @default(true)
+  triggeredAt DateTime?
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([productId])
+}
+
+model SharedLink {
+  id        String    @id @default(cuid())
+  userId    String
+  type      ShareType
+  targetId  String
+  slug      String    @unique
+  viewCount Int       @default(0)
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([targetId])
+}
+
+model DiscoverProduct {
+  id        String           @id @default(cuid())
+  title     String
+  url       String
+  imageUrl  String
+  siteName  String
+  price     Decimal          @db.Decimal(12, 2)
+  currency  String           @default("EUR")
+  category  DiscoverCategory
+  saves     Int              @default(0)
+  createdAt DateTime         @default(now())
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}

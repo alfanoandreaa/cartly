@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/track?cadence=pro",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/track?cadence=free",
+      "schedule": "15 0 * * *"
+    }
+  ]
+}

@@ -9,6 +9,7 @@ import { UpgradeModal } from "@/components/layout/upgrade-modal";
 import { Button } from "@/components/ui/button";
 import type { CartlyCollection } from "@/lib/cartly-data";
 import { normalizeProduct } from "@/lib/cartly-data";
+import { PLAN_LIMITS } from "@/lib/limits";
 import {
   readLocalCollections,
   readLocalPicks,
@@ -24,7 +25,7 @@ type ScrapeResult = {
   inStock: boolean;
   storeKey?: string;
   extractionMethod?: "store-adapter" | "structured-data" | "universal";
-  priceConfidence?: "high" | "medium" | "low";
+  priceSource?: "json-ld" | "meta" | "domain-css" | "manual";
 };
 
 type ScrapeStatus = {
@@ -53,6 +54,19 @@ function normalizeProductUrl(value: string) {
   }
 }
 
+function parseManualPrice(value: string) {
+  const clean = value.trim().replace(/\s/g, "");
+  if (!clean) return null;
+  const lastComma = clean.lastIndexOf(",");
+  const lastDot = clean.lastIndexOf(".");
+  const normalized =
+    lastComma > lastDot
+      ? clean.replace(/\./g, "").replace(",", ".")
+      : clean.replace(/,/g, "");
+  const price = Number.parseFloat(normalized.replace(/[^\d.-]/g, ""));
+  return Number.isFinite(price) && price >= 0 ? price : null;
+}
+
 export function AddProductForm() {
   const { data: session, status } = useSession();
   const [url, setUrl] = useState("");
@@ -62,6 +76,7 @@ export function AddProductForm() {
   const [upgrade, setUpgrade] = useState(false);
   const [collections, setCollections] = useState<CartlyCollection[]>([]);
   const [usesClientStorage, setUsesClientStorage] = useState(false);
+  const [maxProducts, setMaxProducts] = useState<number>(PLAN_LIMITS.FREE.products);
   const [scrapeStatus, setScrapeStatus] = useState<ScrapeStatus>(initialScrapeStatus);
   const lastScrapedUrl = useRef("");
   const scrapeController = useRef<AbortController | null>(null);
@@ -77,6 +92,7 @@ export function AddProductForm() {
         const clientStorage = limitsResponse.headers.get("x-cartly-client-storage") === "true";
         setUsesClientStorage(clientStorage);
         const limits = await limitsResponse.json();
+        setMaxProducts(Number(limits.maxProducts) || PLAN_LIMITS.FREE.products);
 
         if (clientStorage) {
           const picks = readLocalPicks(email);
@@ -175,8 +191,6 @@ export function AddProductForm() {
         collected.price === null ? "price" : null,
         !collected.imageUrl ? "image" : null
       ].filter(Boolean);
-      const priceNeedsReview =
-        collected.price !== null && collected.priceConfidence === "low";
       setUrl(normalizedUrl);
       setResult(collected);
       lastScrapedUrl.current = normalizedUrl;
@@ -184,14 +198,14 @@ export function AddProductForm() {
         stage: "complete",
         progress: 100,
         message: missing.length
-          ? `Details collected. Please review the ${missing.join(", ")}.`
-          : priceNeedsReview
-            ? "Product found. Please double-check the price before saving."
+          ? collected.price === null
+            ? "Prezzo non rilevato — inseriscilo manualmente"
+            : `Details collected. Please review the ${missing.join(", ")}.`
           : "Title, price, and image collected successfully.",
         storeName: collected.siteName,
         storeKey: collected.storeKey
       });
-      if (missing.length || priceNeedsReview) toast.warning("Product found — a few details need your review");
+      if (missing.length) toast.warning("Product found — a few details need your review");
       else toast.success("Product details collected automatically");
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === "AbortError") return;
@@ -232,8 +246,8 @@ export function AddProductForm() {
       url,
       title: String(data.get("title") ?? ""),
       imageUrl: String(data.get("imageUrl") ?? ""),
-      price: priceValue ? Number(priceValue) : null,
-      priceCurrency: result.currency,
+      price: parseManualPrice(priceValue),
+      priceCurrency: String(data.get("currency") ?? result.currency).toUpperCase(),
       siteName: result.siteName,
       inStock: result.inStock,
       personalNote: String(data.get("note") ?? ""),
@@ -244,7 +258,7 @@ export function AddProductForm() {
 
     try {
       const existing = usesClientStorage ? readLocalPicks(email) : [];
-      if (usesClientStorage && session?.user?.plan !== "PRO" && existing.length >= 10) {
+      if (usesClientStorage && session?.user?.plan !== "PRO" && existing.length >= maxProducts) {
         setUpgrade(true);
         return;
       }
@@ -424,25 +438,45 @@ export function AddProductForm() {
               <span className="mb-2 block text-xs text-muted">Title</span>
               <input name="title" required defaultValue={result.title} className="focus-ring h-12 w-full rounded-xl border border-line bg-card px-4 text-sm" />
             </label>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-4">
+              <label className="sm:col-span-2">
+                <span className="mb-2 block text-xs text-muted">Price</span>
+                <input
+                  name="price"
+                  type="text"
+                  inputMode="decimal"
+                  defaultValue={result.price ?? ""}
+                  placeholder={
+                    result.price === null
+                      ? "Prezzo non rilevato — inseriscilo manualmente"
+                      : undefined
+                  }
+                  className={`focus-ring h-12 w-full rounded-xl border bg-card px-4 text-sm ${
+                    result.price === null
+                      ? "border-coral/40 placeholder:text-coral/80"
+                      : "border-line"
+                  }`}
+                />
+              </label>
               <label>
-                <span className="mb-2 flex items-center justify-between text-xs text-muted">
-                  Price ({result.currency})
-                  {result.priceConfidence && (
-                    <span
-                      className={
-                        result.priceConfidence === "high"
-                          ? "text-lime"
-                          : result.priceConfidence === "medium"
-                            ? "text-[#FFD166]"
-                            : "text-coral"
-                      }
-                    >
-                      {result.priceConfidence} confidence
-                    </span>
-                  )}
-                </span>
-                <input name="price" type="number" step="0.01" defaultValue={result.price ?? ""} className="focus-ring h-12 w-full rounded-xl border border-line bg-card px-4 text-sm" />
+                <span className="mb-2 block text-xs text-muted">Currency</span>
+                <select
+                  name="currency"
+                  defaultValue={result.currency}
+                  className="focus-ring h-12 w-full rounded-xl border border-line bg-card px-4 text-sm"
+                >
+                  {!["EUR", "USD", "GBP", "CAD", "AUD", "JPY", "CHF", "PLN"].includes(
+                    result.currency
+                  ) && <option value={result.currency}>{result.currency}</option>}
+                  <option value="EUR">EUR</option>
+                  <option value="USD">USD</option>
+                  <option value="GBP">GBP</option>
+                  <option value="CAD">CAD</option>
+                  <option value="AUD">AUD</option>
+                  <option value="JPY">JPY</option>
+                  <option value="CHF">CHF</option>
+                  <option value="PLN">PLN</option>
+                </select>
               </label>
               <label>
                 <span className="mb-2 block text-xs text-muted">Priority</span>

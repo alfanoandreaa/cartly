@@ -2,7 +2,7 @@ import type { Plan } from "@prisma/client";
 
 export const PLAN_LIMITS = {
   FREE: {
-    products: 10,
+    products: 6,
     collections: 3,
     sharing: false,
     alerts: false,

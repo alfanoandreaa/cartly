@@ -34,8 +34,8 @@ async function trackOne(product: {
     await prisma.product.update({
       where: { id: product.id },
       data: {
-        price: scraped.price,
-        priceCurrency: scraped.currency,
+        price: scraped.price ?? product.price,
+        priceCurrency: scraped.price === null ? product.priceCurrency : scraped.currency,
         inStock: scraped.inStock,
         lastCheckedAt: new Date(),
         priceHistory: history as Prisma.InputJsonValue

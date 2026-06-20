@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
-import { ArrowLeft, BellRing, ExternalLink, Heart, Loader2, Save, Share2, Trash2 } from "lucide-react";
+import { ArrowLeft, BellRing, ExternalLink, Heart, Loader2, RefreshCw, Save, Share2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PriceHistoryChart } from "@/components/product/price-history-chart";
 import { Button } from "@/components/ui/button";
@@ -109,6 +109,48 @@ export function ProductDetailLoader({ id }: { id: string }) {
     router.refresh();
   }
 
+  async function refreshPrice() {
+    if (!product) return;
+    const response = await fetch(`/api/products/${product.id}/refresh`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        url: product.url,
+        currentPrice: product.price,
+        priceHistory: product.priceHistory
+      })
+    });
+    const body = await response.json();
+    if (!response.ok) {
+      throw new Error(
+        body.error === "PRICE_NOT_FOUND"
+          ? "Prezzo non rilevato. Il prezzo salvato non è stato modificato."
+          : body.message ?? body.error ?? "Could not refresh this price"
+      );
+    }
+
+    const next: CartlyProduct = {
+      ...product,
+      price: Number(body.price),
+      priceCurrency: String(body.priceCurrency),
+      priceHistory: Array.isArray(body.priceHistory)
+        ? body.priceHistory.map((point: any) => ({
+            price: Number(point.price),
+            date: String(point.date)
+          }))
+        : product.priceHistory,
+      inStock: body.inStock !== false
+    };
+    setProduct(next);
+    if (clientStorage) {
+      writeLocalPicks(
+        email,
+        readLocalPicks(email).map((item) => (item.id === product.id ? next : item))
+      );
+    }
+    return body.changed as boolean;
+  }
+
   if (loading) {
     return (
       <div className="grid min-h-[70vh] place-items-center text-sm text-muted">
@@ -130,24 +172,35 @@ export function ProductDetailLoader({ id }: { id: string }) {
     );
   }
 
-  return <ProductDetail product={product} collections={collections} onSave={save} onDelete={remove} />;
+  return (
+    <ProductDetail
+      product={product}
+      collections={collections}
+      onSave={save}
+      onDelete={remove}
+      onRefresh={refreshPrice}
+    />
+  );
 }
 
 function ProductDetail({
   product,
   collections,
   onSave,
-  onDelete
+  onDelete,
+  onRefresh
 }: {
   product: CartlyProduct;
   collections: CartlyCollection[];
   onSave: (update: { personalNote: string; priority: Priority; collectionId: string | null }) => Promise<void>;
   onDelete: () => Promise<void>;
+  onRefresh: () => Promise<boolean | undefined>;
 }) {
   const [note, setNote] = useState(product.personalNote ?? "");
   const [priority, setPriority] = useState(product.priority);
   const [collectionId, setCollectionId] = useState(product.collectionId ?? "");
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
@@ -198,6 +251,26 @@ function ProductDetail({
             </Button>
             <Button variant="secondary" size="lg" className="flex-1" onClick={() => toast("Price alerts are included with Cartly Pro")}>
               <BellRing className="h-4 w-4 text-lime" /> Set price alert
+            </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              className="flex-1"
+              disabled={refreshing}
+              onClick={async () => {
+                setRefreshing(true);
+                try {
+                  const changed = await onRefresh();
+                  toast.success(changed ? "Prezzo aggiornato" : "Il prezzo è ancora invariato");
+                } catch (caught) {
+                  toast.error(caught instanceof Error ? caught.message : "Could not refresh this price");
+                } finally {
+                  setRefreshing(false);
+                }
+              }}
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              {refreshing ? "Aggiornamento…" : "Aggiorna prezzo"}
             </Button>
           </div>
           <div className="mt-8 rounded-2xl border border-line bg-surface p-5">

@@ -11,7 +11,7 @@ export default function SignUpPage() {
         <div className="my-auto mx-auto w-full max-w-md py-12">
           <p className="text-sm font-semibold text-lime">START FOR FREE</p>
           <h1 className="mt-2 text-4xl font-bold tracking-tight">Give your wishlist a brain.</h1>
-          <p className="mt-3 text-muted">Ten picks are on us. No card, no pressure, no clutter.</p>
+          <p className="mt-3 text-muted">Six picks are on us. No card, no pressure, no clutter.</p>
           <AuthForm mode="signup" />
           <p className="mt-7 text-center text-sm text-muted">
             Already have Cartly? <Link href="/auth/signin" className="font-semibold text-white hover:text-lime">Sign in</Link>
@@ -24,7 +24,7 @@ export default function SignUpPage() {
             <p className="text-sm font-semibold text-lime">FREE INCLUDES</p>
             <h2 className="mt-3 text-3xl font-bold">A calmer way to want things.</h2>
             <div className="mt-8 space-y-5">
-              {["Ten active product picks", "Three organized collections", "Daily price and stock checks", "Notes, tags, and priorities"].map((feature) => (
+              {["Six active product picks", "Three organized collections", "Daily price and stock checks", "Notes, tags, and priorities"].map((feature) => (
                 <div key={feature} className="flex items-center gap-3">
                   <span className="grid h-6 w-6 place-items-center rounded-full bg-lime text-ink">
                     <Check className="h-4 w-4" />

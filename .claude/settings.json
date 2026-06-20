@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(npm run typecheck)",
+      "PowerShell(npm run test:scraper)",
+      "PowerShell(npm run typecheck; if ($?) { npm run test:scraper })",
+      "mcp__c6d5ed19-a88b-4392-b1a3-25897526b5b1__list_teams",
+      "mcp__c6d5ed19-a88b-4392-b1a3-25897526b5b1__list_projects"
+    ]
+  }
+}

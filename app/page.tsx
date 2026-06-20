@@ -82,7 +82,7 @@ export default function LandingPage() {
               <Link href="/pricing">View pricing</Link>
             </Button>
           </div>
-          <p className="mt-4 text-xs text-muted">No card required · Your first 10 picks are free</p>
+          <p className="mt-4 text-xs text-muted">No card required · Your first 6 picks are free</p>
         </div>
 
         <div className="relative mx-auto mt-20 max-w-6xl">
@@ -302,7 +302,7 @@ export default function LandingPage() {
           <div className="absolute inset-0 opacity-20 [background-image:radial-gradient(#0f0f0f_1px,transparent_1px)] [background-size:18px_18px]" />
           <div className="relative">
             <h2 className="text-balance text-4xl font-bold tracking-tight sm:text-6xl">Your next good decision starts here.</h2>
-            <p className="mx-auto mt-4 max-w-xl text-ink/70">Ten picks, completely free. No pressure — that’s rather the point.</p>
+            <p className="mx-auto mt-4 max-w-xl text-ink/70">Six picks, completely free. No pressure — that’s rather the point.</p>
             <Button asChild size="lg" className="mt-8 bg-ink text-white hover:bg-ink/85">
               <Link href="/auth/signup">
                 Create your Cartly <ArrowRight className="h-4 w-4" />

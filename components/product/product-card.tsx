@@ -7,6 +7,7 @@ import {
   Check,
   FolderHeart,
   MoreHorizontal,
+  RefreshCw,
   Signal,
   Trash2,
   X
@@ -211,14 +212,17 @@ export function ProductCard({
   collections,
   list = false,
   onUpdate,
-  onDelete
+  onDelete,
+  onRefresh
 }: {
   product: CartlyProduct;
   collections: CartlyCollection[];
   list?: boolean;
   onUpdate: (update: ProductUpdate) => Promise<void>;
   onDelete: () => Promise<void>;
+  onRefresh: () => Promise<void>;
 }) {
+  const [refreshing, setRefreshing] = useState(false);
   const discount =
     product.oldPrice && product.price
       ? Math.round((1 - product.price / product.oldPrice) * 100)
@@ -235,11 +239,31 @@ export function ProductCard({
             <span className="grid h-full place-items-center text-2xl">🛍️</span>
           )}
         </Link>
-        <Link href={`/app/dashboard/product/${product.id}`} className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-[.16em] text-muted">{product.siteName}</p>
-          <h3 className="mt-1 truncate font-semibold">{product.title}</h3>
-          <p className="mt-1 hidden text-xs text-muted sm:block">{product.collection?.name ?? "No collection"}</p>
-        </Link>
+        <div className="min-w-0">
+          <Link href={`/app/dashboard/product/${product.id}`}>
+            <p className="text-[10px] font-bold uppercase tracking-[.16em] text-muted">{product.siteName}</p>
+            <h3 className="mt-1 truncate font-semibold">{product.title}</h3>
+            <p className="mt-1 hidden text-xs text-muted sm:block">{product.collection?.name ?? "No collection"}</p>
+          </Link>
+          <button
+            type="button"
+            disabled={refreshing}
+            onClick={async () => {
+              setRefreshing(true);
+              try {
+                await onRefresh();
+              } catch {
+                // The parent shows the refresh error toast.
+              } finally {
+                setRefreshing(false);
+              }
+            }}
+            className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-lime transition hover:text-white disabled:opacity-60"
+          >
+            <RefreshCw className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`} />
+            Aggiorna prezzo
+          </button>
+        </div>
         <div className="hidden sm:block">
           <p className="font-semibold">{formatPrice(product.price, product.priceCurrency)}</p>
           {product.oldPrice && <p className="text-xs text-muted line-through">{formatPrice(product.oldPrice)}</p>}
@@ -299,6 +323,24 @@ export function ProductCard({
         <p className="mt-3 truncate text-[11px] text-muted">
           {product.collection ? `${product.collection.emoji} ${product.collection.name}` : "No collection"}
         </p>
+        <button
+          type="button"
+          disabled={refreshing}
+          onClick={async () => {
+            setRefreshing(true);
+            try {
+              await onRefresh();
+            } catch {
+              // The parent shows the refresh error toast.
+            } finally {
+              setRefreshing(false);
+            }
+          }}
+          className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-line text-xs font-semibold text-muted transition hover:border-lime/40 hover:text-lime disabled:opacity-60"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          {refreshing ? "Aggiornamento…" : "Aggiorna prezzo"}
+        </button>
       </div>
     </article>
   );

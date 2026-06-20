@@ -164,6 +164,58 @@ export function ProductGrid() {
     }
   }
 
+  async function refreshProduct(id: string) {
+    const product = products.find((item) => item.id === id);
+    if (!product) return;
+
+    try {
+      const response = await fetch(`/api/products/${id}/refresh`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          url: product.url,
+          currentPrice: product.price,
+          priceHistory: product.priceHistory
+        })
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(
+          body.error === "PRICE_NOT_FOUND"
+            ? "Prezzo non rilevato. Il prezzo salvato non è stato modificato."
+            : body.message ?? body.error ?? "Could not refresh this price"
+        );
+      }
+
+      const next = products.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              price: Number(body.price),
+              priceCurrency: String(body.priceCurrency),
+              priceHistory: Array.isArray(body.priceHistory)
+                ? body.priceHistory.map((point: any) => ({
+                    price: Number(point.price),
+                    date: String(point.date)
+                  }))
+                : item.priceHistory,
+              inStock: body.inStock !== false
+            }
+          : item
+      );
+      setProducts(next);
+      if (clientStorage.current) writeLocalPicks(email, next);
+      toast.success(
+        body.changed
+          ? `Prezzo aggiornato: ${body.priceCurrency} ${Number(body.price).toFixed(2)}`
+          : "Il prezzo è ancora invariato"
+      );
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : "Could not refresh this price");
+      throw caught;
+    }
+  }
+
   return (
     <>
       <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
@@ -266,6 +318,7 @@ export function ProductGrid() {
               list={view === "list"}
               onUpdate={(update) => updateProduct(product.id, update)}
               onDelete={() => deleteProduct(product.id)}
+              onRefresh={() => refreshProduct(product.id)}
             />
           ))}
         </div>

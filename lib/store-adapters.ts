@@ -9,6 +9,7 @@ export type StoreKey =
   | "shein"
   | "asos"
   | "zara"
+  | "hm"
   | "ikea"
   | "nike"
   | "generic";
@@ -55,11 +56,12 @@ export const STORE_ADAPTERS: StoreAdapter[] = [
     domains: [/(^|\.)amazon\.[a-z.]+$/i, /(^|\.)amzn\.(to|eu)$/i],
     titleSelectors: ["#productTitle", "#title span", "h1#title"],
     priceSelectors: [
-      "#corePrice_feature_div .a-price .a-offscreen",
       "#corePriceDisplay_desktop_feature_div .a-price .a-offscreen",
-      ".apexPriceToPay .a-offscreen",
       "#priceblock_ourprice",
       "#priceblock_dealprice",
+      '.a-price[data-a-color="price"] .a-offscreen',
+      "#corePrice_feature_div .a-price .a-offscreen",
+      ".apexPriceToPay .a-offscreen",
       "#price_inside_buybox"
     ],
     imageSelectors: [
@@ -86,11 +88,8 @@ export const STORE_ADAPTERS: StoreAdapter[] = [
       'h1[class*="title"]'
     ],
     priceSelectors: [
-      '[data-testid="product-price"]',
-      '[data-test="product-price"]',
-      '[class*="sale-price"]',
-      '[class*="product-price"]',
-      '[class*="price"]'
+      '[class*="goods-price__current"]',
+      '[class*="price-current"]'
     ],
     imageSelectors: [
       '[data-testid="product-image"] img',
@@ -116,9 +115,7 @@ export const STORE_ADAPTERS: StoreAdapter[] = [
     ],
     priceSelectors: [
       ".product-price-value",
-      '[class*="price--current"]',
-      '[class*="price--originalText"]',
-      '[class*="price"]'
+      '[class*="product-price__current"]'
     ],
     imageSelectors: [
       ".images-view-item img",
@@ -210,7 +207,7 @@ export const STORE_ADAPTERS: StoreAdapter[] = [
     name: "Zalando",
     domains: [/(^|\.)zalando\.[a-z.]+$/i, /(^|\.)zalando-lounge\.[a-z.]+$/i],
     titleSelectors: ['h1[data-testid="product-name"]', 'h1[class*="name"]', "main h1"],
-    priceSelectors: ['[data-testid="product-price"]', '[class*="price"]'],
+    priceSelectors: ['[class*="sDq_FX"]', '[data-testid="price"]'],
     imageSelectors: ['[data-testid="pdp-gallery"] img', 'main picture img', 'main img'],
     availabilitySelectors: ['[data-testid*="size"]', '[class*="sold-out"]'],
     embeddedTitleKeys: ["name", "productName"],
@@ -264,9 +261,8 @@ export const STORE_ADAPTERS: StoreAdapter[] = [
       "main h1"
     ],
     priceSelectors: [
-      ".money-amount__main",
-      '[data-qa-qualifier="product-detail-info-price"]',
-      '[class*="price"]'
+      ".price__amount",
+      '[class*="price-current"]'
     ],
     imageSelectors: [
       ".media-image__image",
@@ -281,6 +277,20 @@ export const STORE_ADAPTERS: StoreAdapter[] = [
     defaultCurrency: marketplaceCurrency
   },
   {
+    key: "hm",
+    name: "H&M",
+    domains: [/(^|\.)hm\.com$/i],
+    titleSelectors: [".ProductName-module--productTitle__3ry9w", "main h1", "h1"],
+    priceSelectors: [".price-value", '[class*="product-price"]'],
+    imageSelectors: [".product-detail-main-image img", "main picture img", "main img"],
+    availabilitySelectors: ['[class*="availability"]', '[class*="sold-out"]'],
+    embeddedTitleKeys: ["productName", "name"],
+    embeddedPriceKeys: ["redPrice", "whitePrice", "price"],
+    embeddedImageKeys: ["imageUrl", "src"],
+    browserPreferred: true,
+    defaultCurrency: marketplaceCurrency
+  },
+  {
     key: "ikea",
     name: "IKEA",
     domains: [/(^|\.)ikea\.[a-z.]+$/i],
@@ -290,9 +300,8 @@ export const STORE_ADAPTERS: StoreAdapter[] = [
       'h1[data-testid="product-name"]'
     ],
     priceSelectors: [
-      ".pip-temp-price__integer",
       ".pip-price__integer",
-      '[data-testid="product-price"]'
+      '[class*="pip-price"]'
     ],
     imageSelectors: [
       ".pip-image img",

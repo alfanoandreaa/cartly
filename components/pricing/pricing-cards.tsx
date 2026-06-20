@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const freeFeatures = [
-  "Save up to 10 products",
+  "Save up to 6 products",
   "Create up to 3 collections",
   "Daily price refresh",
   "Notes, tags, and priorities"

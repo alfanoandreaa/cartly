@@ -96,7 +96,7 @@ async function fetchStructuredProduct(
   });
 
   const response = await fetch(scraperApiStructuredEndpoint(url), {
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(25_000),
     cache: "no-store"
   });
   if (!response.ok) return null;
@@ -540,7 +540,7 @@ async function fetchHtml(url: string, report?: ProgressReporter, render = false)
         : "Connecting to the store…"
     });
     const response = await fetch(scraperApiEndpoint(target, render), {
-      signal: AbortSignal.timeout(render ? 50_000 : 30_000),
+      signal: AbortSignal.timeout(render ? 40_000 : 25_000),
       cache: "no-store"
     });
     if (!response.ok) throw new Error(`Scraping service returned ${response.status}`);
@@ -648,20 +648,22 @@ export async function scrapeProduct(input: string, report?: ProgressReporter): P
 
   // Step 1: for supported retailers use ScraperAPI's structured-data parser —
   // it returns pre-parsed price/title/image directly, bypassing HTML fragility.
+  let structuredPartial: ScrapedProduct | null = null;
   try {
     const structured = await fetchStructuredProduct(url, adapter, report);
-    if (structured) {
+    if (structured?.price != null) {
       await report?.({
         stage: "complete",
         progress: 100,
-        message: structured.price
-          ? `${structured.siteName} product details ready`
-          : "Price not detected — enter it manually",
+        message: `${structured.siteName} product details ready`,
         storeName: structured.siteName,
         storeKey: adapter.key
       });
       return structured;
     }
+    // No price yet — keep any title/image so the manual form is pre-filled,
+    // then fall through to HTML scraping which may still find the price.
+    structuredPartial = structured;
   } catch {
     // Fall through to HTML scraping.
   }
@@ -723,10 +725,12 @@ export async function scrapeProduct(input: string, report?: ProgressReporter): P
     // Fall through to the manual-entry result below.
   }
 
-  // Nothing worked — return whatever metadata we have for manual completion.
-  const result = initialHtml
-    ? extractMetadata(initialHtml, finalUrl, adapter, null)
-    : manualFallback(finalUrl, adapter);
+  // Nothing worked — return the richest metadata we have for manual completion.
+  const result =
+    structuredPartial ??
+    (initialHtml
+      ? extractMetadata(initialHtml, finalUrl, adapter, null)
+      : manualFallback(finalUrl, adapter));
   await report?.({
     stage: "complete",
     progress: 100,

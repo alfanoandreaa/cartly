@@ -48,6 +48,18 @@ const headers = {
   "accept-language": "en-US,en;q=0.9,it;q=0.8"
 };
 
+// Optional third-party scraping service (ScraperAPI). When configured, requests
+// are routed through it so retailers like Amazon don't block the server's IP.
+// Without a key we fall back to a direct fetch (fine for local development).
+const SCRAPER_API_KEY = process.env.SCRAPERAPI_KEY?.trim();
+
+function scraperApiEndpoint(targetUrl: string, render: boolean) {
+  const params = new URLSearchParams({ api_key: SCRAPER_API_KEY!, url: targetUrl });
+  // `render` runs the page in a real browser for JavaScript-heavy stores.
+  if (render) params.set("render", "true");
+  return `https://api.scraperapi.com/?${params.toString()}`;
+}
+
 export function normalizePrice(value?: string | number | null) {
   if (typeof value === "number") {
     return Number.isFinite(value) && value >= 0 ? value : null;
@@ -431,8 +443,29 @@ function extractMetadata(
   };
 }
 
-async function fetchHtml(url: string, report?: ProgressReporter) {
-  let current = (await assertPublicUrl(url)).toString();
+async function fetchHtml(url: string, report?: ProgressReporter, render = false) {
+  const target = (await assertPublicUrl(url)).toString();
+
+  // Preferred path: route through the scraping service to avoid IP blocks.
+  if (SCRAPER_API_KEY) {
+    await report?.({
+      stage: render ? "browser" : "connecting",
+      progress: render ? 60 : 40,
+      message: render
+        ? "Opening the page in a real browser…"
+        : "Connecting to the store…"
+    });
+    const response = await fetch(scraperApiEndpoint(target, render), {
+      signal: AbortSignal.timeout(render ? 50_000 : 30_000),
+      cache: "no-store"
+    });
+    if (!response.ok) throw new Error(`Scraping service returned ${response.status}`);
+    await report?.({ stage: "reading", progress: 70, message: "Reading the product page…" });
+    return { html: await response.text(), finalUrl: target };
+  }
+
+  // Fallback: direct request (works locally, often blocked from a server).
+  let current = target;
   for (let redirects = 0; redirects <= 4; redirects += 1) {
     await report?.({
       stage: "connecting",
@@ -529,21 +562,23 @@ export async function scrapeProduct(input: string, report?: ProgressReporter): P
     storeKey: adapter.key
   });
 
+  // JavaScript-heavy stores need a real browser even for the first read.
+  const rendered = Boolean(SCRAPER_API_KEY) && adapter.browserPreferred === true;
   let initialHtml = "";
   let finalUrl = url;
   try {
-    const fetched = await fetchHtml(url, report);
+    const fetched = await fetchHtml(url, report, rendered);
     initialHtml = fetched.html;
     finalUrl = fetched.finalUrl;
     adapter = detectStore(finalUrl);
   } catch {
-    // Step 4 can still succeed when the direct HTTP request is blocked.
+    // The rendering step below can still recover.
   }
 
   if (initialHtml) {
     await report?.({
       stage: "extracting",
-      progress: 70,
+      progress: 78,
       message: "Checking structured data, product meta tags, and store selectors…",
       storeName: adapter.name,
       storeKey: adapter.key
@@ -562,42 +597,39 @@ export async function scrapeProduct(input: string, report?: ProgressReporter): P
     }
   }
 
-  // Step 4: render JavaScript, then repeat steps 1–3 on the rendered DOM.
-  try {
-    const renderedHtml = await fetchRenderedHtml(finalUrl, adapter, report);
-    const renderedPrice = extractPriceByHierarchy(renderedHtml, finalUrl, adapter);
-    const result = extractMetadata(renderedHtml, finalUrl, adapter, renderedPrice);
-    await report?.({
-      stage: "complete",
-      progress: 100,
-      message: renderedPrice
-        ? `${result.siteName} product details ready`
-        : "Price not detected — enter it manually",
-      storeName: result.siteName,
-      storeKey: adapter.key
-    });
-    return result;
-  } catch {
-    if (initialHtml) {
-      const result = extractMetadata(initialHtml, finalUrl, adapter, null);
+  // Second pass: render JavaScript and retry — unless we already rendered above.
+  if (!(rendered && initialHtml)) {
+    try {
+      const renderedHtml = SCRAPER_API_KEY
+        ? (await fetchHtml(finalUrl, report, true)).html
+        : await fetchRenderedHtml(finalUrl, adapter, report);
+      const renderedPrice = extractPriceByHierarchy(renderedHtml, finalUrl, adapter);
+      const result = extractMetadata(renderedHtml, finalUrl, adapter, renderedPrice);
       await report?.({
         stage: "complete",
         progress: 100,
-        message: "Price not detected — enter it manually",
+        message: renderedPrice
+          ? `${result.siteName} product details ready`
+          : "Price not detected — enter it manually",
         storeName: result.siteName,
         storeKey: adapter.key
       });
       return result;
+    } catch {
+      // Fall through to the manual-entry result below.
     }
-
-    const result = manualFallback(finalUrl, adapter);
-    await report?.({
-      stage: "complete",
-      progress: 100,
-      message: "Price not detected — enter it manually",
-      storeName: result.siteName,
-      storeKey: adapter.key
-    });
-    return result;
   }
+
+  // Nothing worked — return whatever metadata we have for manual completion.
+  const result = initialHtml
+    ? extractMetadata(initialHtml, finalUrl, adapter, null)
+    : manualFallback(finalUrl, adapter);
+  await report?.({
+    stage: "complete",
+    progress: 100,
+    message: "Price not detected — enter it manually",
+    storeName: result.siteName,
+    storeKey: adapter.key
+  });
+  return result;
 }

@@ -36,7 +36,10 @@ pnpm db:migrate
 - Stripe webhooks: forward events to `/api/stripe/webhook`.
 - Email: set `RESEND_API_KEY`. Without it, email events are logged as previews.
 - Browser scraping: Vercel uses `@sparticuz/chromium`; local deployments can set `CHROME_EXECUTABLE_PATH`.
-- Cron: set `CRON_SECRET` in both Vercel and the app environment.
+- Cron: set `CRON_SECRET` in both Vercel and the app environment. The included
+  Vercel Hobby configuration checks all picks once daily. A 6-hour Cartly Pro
+  refresh requires Vercel Pro or an external scheduler calling
+  `/api/cron/track?cadence=pro`.
 
 ## Important routes
 

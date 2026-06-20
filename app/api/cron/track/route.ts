@@ -121,12 +121,17 @@ export async function GET(request: Request) {
   }
   if (!process.env.DATABASE_URL) return NextResponse.json({ checked: 0, demo: true });
 
-  const cadence = new URL(request.url).searchParams.get("cadence") === "free" ? "FREE" : "PRO";
-  const hours = cadence === "PRO" ? 6 : 24;
-  const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
+  const requestedCadence = new URL(request.url).searchParams.get("cadence");
+  const cadence =
+    requestedCadence === "free"
+      ? "FREE"
+      : requestedCadence === "pro"
+        ? "PRO"
+        : "ALL";
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const products = await prisma.product.findMany({
     where: {
-      user: { plan: cadence },
+      ...(cadence === "ALL" ? {} : { user: { plan: cadence } }),
       OR: [{ lastCheckedAt: null }, { lastCheckedAt: { lte: cutoff } }]
     },
     include: {

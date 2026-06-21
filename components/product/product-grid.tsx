@@ -6,11 +6,13 @@ import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ProductCard } from "@/components/product/product-card";
+import { useTranslation } from "@/components/providers/i18n-provider";
 import { Button } from "@/components/ui/button";
 import type { CartlyCollection, CartlyProduct, Priority } from "@/lib/cartly-data";
 import { normalizeProduct } from "@/lib/cartly-data";
 import {
   CARTLY_STORAGE_EVENT,
+  notifyStorageUpdated,
   readLocalCollections,
   readLocalPicks,
   writeLocalPicks
@@ -24,6 +26,7 @@ type ProductUpdate = {
 
 export function ProductGrid() {
   const { data: session, status } = useSession();
+  const { t } = useTranslation();
   const [view, setView] = useState<"grid" | "list">("grid");
   const [filter, setFilter] = useState("all");
   const [products, setProducts] = useState<CartlyProduct[]>([]);
@@ -155,6 +158,9 @@ export function ProductGrid() {
       } else {
         const response = await fetch(`/api/products/${id}`, { method: "DELETE" });
         if (!response.ok) throw new Error("Could not delete this pick");
+        // Tell the sidebar to re-read the usage count right away instead of
+        // waiting for a navigation or manual refresh.
+        notifyStorageUpdated();
       }
       toast.success("Pick deleted");
     } catch (caught) {
@@ -221,16 +227,14 @@ export function ProductGrid() {
       <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-semibold text-lime">{today}</p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">Your picks</h1>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">{t("picks.title")}</h1>
           <p className="mt-2 text-sm text-muted">
-            {products.length
-              ? `${products.length} good ${products.length === 1 ? "reason" : "reasons"} not to keep another tab open.`
-              : "Save the things worth remembering. Cartly will keep watch."}
+            {products.length ? t("picks.subtitle") : t("picks.subtitleEmpty")}
           </p>
         </div>
         <Button asChild className="sm:hidden">
           <Link href="/app/dashboard/add-product">
-            <Plus className="h-4 w-4" /> Add a pick
+            <Plus className="h-4 w-4" /> {t("action.addPick")}
           </Link>
         </Button>
       </div>
@@ -244,7 +248,7 @@ export function ProductGrid() {
               filter === "all" ? "border-lime bg-lime text-ink" : "border-line bg-surface text-muted hover:text-white"
             )}
           >
-            All
+            {t("picks.filterAll")}
           </button>
           {collections.map((collection) => (
             <button
@@ -275,19 +279,19 @@ export function ProductGrid() {
             </button>
           </div>
           <Button variant="secondary" size="sm" className="hidden sm:inline-flex">
-            <SlidersHorizontal className="h-4 w-4" /> Filter
+            <SlidersHorizontal className="h-4 w-4" /> {t("picks.filter")}
           </Button>
         </div>
       )}
 
       {loading ? (
         <div className="mt-16 flex items-center justify-center gap-3 text-sm text-muted">
-          <Loader2 className="h-5 w-5 animate-spin text-lime" /> Loading your picks…
+          <Loader2 className="h-5 w-5 animate-spin text-lime" /> {t("picks.loading")}
         </div>
       ) : error ? (
         <div className="mt-10 rounded-2xl border border-coral/20 bg-coral/5 p-8 text-center">
           <p className="font-semibold text-coral">{error}</p>
-          <Button variant="secondary" className="mt-4" onClick={loadData}>Try again</Button>
+          <Button variant="secondary" className="mt-4" onClick={loadData}>{t("picks.tryAgain")}</Button>
         </div>
       ) : products.length === 0 ? (
         <div className="mt-10 grid min-h-[420px] place-items-center rounded-[28px] border border-dashed border-line bg-white/[0.02] p-8 text-center">
@@ -295,18 +299,16 @@ export function ProductGrid() {
             <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-lime/10 text-lime">
               <ShoppingBag className="h-7 w-7" />
             </span>
-            <h2 className="mt-6 text-2xl font-bold">Your Cartly is ready for its first pick.</h2>
-            <p className="mt-3 leading-relaxed text-muted">
-              Paste a product link from any store. We’ll collect the details and keep it organized for you.
-            </p>
+            <h2 className="mt-6 text-2xl font-bold">{t("picks.emptyTitle")}</h2>
+            <p className="mt-3 leading-relaxed text-muted">{t("picks.emptyBody")}</p>
             <Button asChild size="lg" className="mt-7">
-              <Link href="/app/dashboard/add-product"><Plus className="h-4 w-4" /> Add your first pick</Link>
+              <Link href="/app/dashboard/add-product"><Plus className="h-4 w-4" /> {t("picks.emptyCta")}</Link>
             </Button>
           </div>
         </div>
       ) : filtered.length === 0 ? (
         <div className="mt-10 rounded-2xl border border-line bg-surface p-10 text-center text-muted">
-          No picks in this collection yet.
+          {t("picks.emptyCollection")}
         </div>
       ) : (
         <div className={cn("mt-5 grid gap-4", view === "grid" ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" : "grid-cols-1")}>

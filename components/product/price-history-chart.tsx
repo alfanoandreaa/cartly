@@ -1,9 +1,14 @@
 "use client";
 
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { useAccent } from "@/components/providers/theme-provider";
+import { accentById } from "@/lib/theme";
 import { formatPrice } from "@/lib/utils";
 
 export function PriceHistoryChart({ data }: { data: { date: string; price: number }[] }) {
+  const { accent } = useAccent();
+  const accentHex = accentById(accent).hex;
+
   if (!data.length) {
     return (
       <div className="grid h-52 place-items-center rounded-2xl border border-dashed border-line text-center text-sm text-muted">
@@ -36,8 +41,8 @@ export function PriceHistoryChart({ data }: { data: { date: string; price: numbe
           <AreaChart data={data} margin={{ top: 8, right: 5, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id="priceFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#C8FF00" stopOpacity={0.25} />
-                <stop offset="95%" stopColor="#C8FF00" stopOpacity={0} />
+                <stop offset="5%" stopColor={accentHex} stopOpacity={0.25} />
+                <stop offset="95%" stopColor={accentHex} stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid stroke="#2e2e2e" strokeDasharray="4 4" vertical={false} />
@@ -47,7 +52,7 @@ export function PriceHistoryChart({ data }: { data: { date: string; price: numbe
               contentStyle={{ background: "#232323", border: "1px solid #353535", borderRadius: 12, fontSize: 12 }}
               formatter={(value: number) => [formatPrice(value), "Price"]}
             />
-            <Area type="monotone" dataKey="price" stroke="#C8FF00" strokeWidth={2.5} fill="url(#priceFill)" />
+            <Area type="monotone" dataKey="price" stroke={accentHex} strokeWidth={2.5} fill="url(#priceFill)" />
           </AreaChart>
         </ResponsiveContainer>
       </div>

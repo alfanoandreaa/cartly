@@ -1,9 +1,19 @@
 "use client";
 
-import { Check, Sparkles, X } from "lucide-react";
+import { BellRing, Bookmark, FolderHeart, Share2, Sparkles, X } from "lucide-react";
+import { useTranslation } from "@/components/providers/i18n-provider";
+import type { TranslationKey } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 
+const benefits: { icon: typeof Bookmark; titleKey: TranslationKey; bodyKey: TranslationKey }[] = [
+  { icon: Bookmark, titleKey: "upgrade.featurePicksTitle", bodyKey: "upgrade.featurePicksBody" },
+  { icon: BellRing, titleKey: "upgrade.featureAlertsTitle", bodyKey: "upgrade.featureAlertsBody" },
+  { icon: FolderHeart, titleKey: "upgrade.featureCollectionsTitle", bodyKey: "upgrade.featureCollectionsBody" },
+  { icon: Share2, titleKey: "upgrade.featureSharingTitle", bodyKey: "upgrade.featureSharingBody" }
+];
+
 export function UpgradeModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[100] grid place-items-center bg-black/80 p-4 backdrop-blur-sm" onMouseDown={onClose}>
@@ -23,23 +33,24 @@ export function UpgradeModal({ open, onClose }: { open: boolean; onClose: () => 
           <span className="grid h-12 w-12 place-items-center rounded-2xl bg-lime text-ink">
             <Sparkles className="h-6 w-6" />
           </span>
-          <p className="mt-6 text-xs font-bold uppercase tracking-[.2em] text-lime">Your wishlist is popular</p>
-          <h2 className="mt-2 max-w-lg text-3xl font-bold tracking-tight sm:text-4xl">
-            You’ve hit your free limit — go Cartly Pro
-          </h2>
-          <p className="mt-4 max-w-xl leading-relaxed text-muted">
-            Keep every good find, get price-drop alerts, and unlock a faster, smarter Cartly.
-          </p>
+          <p className="mt-6 text-xs font-bold uppercase tracking-[.2em] text-lime">{t("upgrade.eyebrow")}</p>
+          <h2 className="mt-2 max-w-lg text-3xl font-bold tracking-tight sm:text-4xl">{t("upgrade.title")}</h2>
+          <p className="mt-4 max-w-xl leading-relaxed text-muted">{t("upgrade.subtitle")}</p>
+
           <div className="mt-7 grid gap-3 sm:grid-cols-2">
-            {["20 active picks", "Unlimited collections", "Price & stock alerts", "Public sharing"].map((item) => (
-              <p key={item} className="flex items-center gap-3 text-sm">
-                <span className="grid h-5 w-5 place-items-center rounded-full bg-lime/15 text-lime">
-                  <Check className="h-3.5 w-3.5" />
+            {benefits.map(({ icon: Icon, titleKey, bodyKey }) => (
+              <div key={titleKey} className="flex gap-3 rounded-2xl border border-line bg-surface/60 p-4">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
+                  <Icon className="h-[18px] w-[18px]" />
                 </span>
-                {item}
-              </p>
+                <span>
+                  <span className="block text-sm font-semibold">{t(titleKey)}</span>
+                  <span className="mt-0.5 block text-xs leading-relaxed text-muted">{t(bodyKey)}</span>
+                </span>
+              </div>
             ))}
           </div>
+
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
             <Button
               size="lg"
@@ -47,13 +58,13 @@ export function UpgradeModal({ open, onClose }: { open: boolean; onClose: () => 
                 window.location.href = "/api/stripe/checkout?interval=year";
               }}
             >
-              Get Cartly Pro · €59/year
+              {t("upgrade.cta")}
             </Button>
             <Button variant="ghost" onClick={onClose}>
-              Maybe later
+              {t("upgrade.later")}
             </Button>
           </div>
-          <p className="mt-4 text-xs text-muted">That’s €4.92/month. Cancel whenever you like.</p>
+          <p className="mt-4 text-xs text-muted">{t("upgrade.fineprint")}</p>
         </div>
       </div>
     </div>

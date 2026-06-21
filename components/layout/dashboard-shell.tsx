@@ -17,8 +17,10 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Logo } from "@/components/brand/logo";
+import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { PlanBadge } from "@/components/layout/plan-badge";
 import { UpgradeModal } from "@/components/layout/upgrade-modal";
+import { useTranslation } from "@/components/providers/i18n-provider";
 import { Button } from "@/components/ui/button";
 import type { CartlyCollection } from "@/lib/cartly-data";
 import {
@@ -30,12 +32,13 @@ import { PLAN_LIMITS } from "@/lib/limits";
 import { cn } from "@/lib/utils";
 
 const mainLinks = [
-  { href: "/app/dashboard", label: "All picks", icon: LayoutGrid },
-  { href: "/app/dashboard/collections", label: "Collections", icon: FolderHeart }
-];
+  { href: "/app/dashboard", labelKey: "nav.allPicks", icon: LayoutGrid },
+  { href: "/app/dashboard/collections", labelKey: "nav.collections", icon: FolderHeart }
+] as const;
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
+  const { t } = useTranslation();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
@@ -115,12 +118,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <div className="px-3 pt-4">
         <Button asChild className="w-full justify-start">
           <Link href="/app/dashboard/add-product" onClick={() => setMobileOpen(false)}>
-            <Plus className="h-4 w-4" /> Add a pick
+            <Plus className="h-4 w-4" /> {t("action.addPick")}
           </Link>
         </Button>
       </div>
       <nav className="mt-6 space-y-1 px-3">
-        {mainLinks.map(({ href, label, icon: Icon }) => {
+        {mainLinks.map(({ href, labelKey, icon: Icon }) => {
           const active = href === "/app/dashboard" ? pathname === href : pathname.startsWith(href);
           return (
             <Link
@@ -133,14 +136,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               )}
             >
               <Icon className={cn("h-[18px] w-[18px]", active && "text-lime")} />
-              {label}
+              {t(labelKey)}
             </Link>
           );
         })}
       </nav>
       <div className="mt-7 px-5">
         <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-[.16em] text-muted">
-          <span>Your collections</span>
+          <span>{t("sidebar.yourCollections")}</span>
           <Link href="/app/dashboard/collections" aria-label="Manage collections">
             <Plus className="h-3.5 w-3.5" />
           </Link>
@@ -158,32 +161,32 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </Link>
           ))}
           {collections.length === 0 && (
-            <p className="px-1 py-2 text-xs leading-relaxed text-muted/70">No collections yet.</p>
+            <p className="px-1 py-2 text-xs leading-relaxed text-muted/70">{t("sidebar.noCollections")}</p>
           )}
         </div>
       </div>
       <div className="mt-auto p-4">
         <div className="rounded-2xl border border-line bg-card p-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold">Picks used</span>
+            <span className="text-xs font-semibold">{t("sidebar.picksUsed")}</span>
             <span className="text-xs text-muted">{productCount}/{maxProducts}</span>
           </div>
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-lime to-[#7ee787] transition-[width]"
+              className="h-full rounded-full bg-gradient-to-r from-lime to-lime/60 transition-[width]"
               style={{ width: `${usage}%` }}
             />
           </div>
           <p className="mt-3 text-xs leading-relaxed text-muted">
             {productCount >= maxProducts
               ? plan === "FREE"
-                ? "Your free wishlist is full."
-                : "You’ve reached the suggested Cartly Pro limit."
-              : `${maxProducts - productCount} ${maxProducts - productCount === 1 ? "pick" : "picks"} available.`}
+                ? t("sidebar.fullFree")
+                : t("sidebar.fullPro")
+              : t("sidebar.available", { n: Math.max(0, maxProducts - productCount) })}
           </p>
           {plan === "FREE" && (
             <button onClick={() => setUpgradeOpen(true)} className="mt-3 text-xs font-semibold text-lime hover:underline">
-              Upgrade to Cartly Pro →
+              {t("action.upgradeToPro")}
             </button>
           )}
         </div>
@@ -191,7 +194,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           href="/app/dashboard/settings"
           className="mt-3 flex h-11 items-center gap-3 rounded-xl px-3 text-sm text-muted transition hover:bg-white/[0.04] hover:text-white"
         >
-          <Settings className="h-[18px] w-[18px]" /> Settings
+          <Settings className="h-[18px] w-[18px]" /> {t("nav.settings")}
         </Link>
       </div>
     </aside>
@@ -214,15 +217,16 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <div className="relative hidden max-w-lg flex-1 sm:block">
             <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <input
-              placeholder="Search picks, tags, stores…"
+              placeholder={t("search.placeholder")}
               className="focus-ring h-10 w-full rounded-xl border border-line bg-surface pl-10 pr-4 text-sm placeholder:text-muted/70"
             />
           </div>
+          <LanguageSwitcher className="ml-auto sm:ml-0" />
           <div className="ml-auto flex items-center gap-2">
             <PlanBadge plan={plan} />
             {plan === "FREE" && (
               <Button variant="secondary" size="sm" className="hidden sm:inline-flex" onClick={() => setUpgradeOpen(true)}>
-                <Sparkles className="h-4 w-4 text-lime" /> Upgrade
+                <Sparkles className="h-4 w-4 text-lime" /> {t("action.upgrade")}
               </Button>
             )}
             <button className="relative grid h-10 w-10 place-items-center rounded-xl text-muted transition hover:bg-white/5 hover:text-white" aria-label="Notifications">

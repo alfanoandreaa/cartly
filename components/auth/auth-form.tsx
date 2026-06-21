@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { setRememberPreference } from "@/lib/remember";
+import { cn } from "@/lib/utils";
 
 export function AuthForm({
   mode,
@@ -17,7 +19,13 @@ export function AuthForm({
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState("");
+
+  function handleGoogle() {
+    setRememberPreference(remember);
+    signIn("google", { callbackUrl: "/app/dashboard" });
+  }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -40,6 +48,7 @@ export function AuthForm({
         }
       }
 
+      setRememberPreference(remember);
       const result = await signIn("credentials", { email, password, redirect: false });
       if (result?.error) throw new Error("Email or password not recognized");
       router.push(mode === "signup" ? "/app/onboarding" : "/app/dashboard");
@@ -101,18 +110,25 @@ export function AuthForm({
         </span>
       </label>
       {error && <p className="rounded-xl border border-coral/20 bg-coral/10 px-4 py-3 text-sm text-coral">{error}</p>}
-      <Button type="submit" size="lg" className="w-full" disabled={loading}>
-        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === "signup" ? "Create my Cartly" : "Sign in"}
-        {!loading && <ArrowRight className="h-4 w-4" />}
-      </Button>
-      {googleEnabled && (
-        <>
-          <div className="relative py-2">
-            <div className="absolute inset-x-0 top-1/2 border-t border-line" />
-            <span className="relative mx-auto block w-fit bg-ink px-3 text-xs text-muted">or continue with</span>
-          </div>
-          <Button type="button" variant="secondary" size="lg" className="w-full" onClick={() => signIn("google", { callbackUrl: "/app/dashboard" })}>
-            <svg viewBox="0 0 24 24" className="h-4 w-4">
+
+      <label className="flex cursor-pointer select-none items-center gap-2.5 text-sm text-muted">
+        <input
+          type="checkbox"
+          checked={remember}
+          onChange={(event) => setRemember(event.target.checked)}
+          className="h-4 w-4 rounded accent-lime"
+        />
+        Keep me signed in on this device
+      </label>
+
+      <div className={cn("grid gap-3", googleEnabled && "sm:grid-cols-2")}>
+        <Button type="submit" size="lg" className="w-full" disabled={loading}>
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === "signup" ? "Create an account" : "Sign in"}
+          {!loading && <ArrowRight className="h-4 w-4" />}
+        </Button>
+        {googleEnabled && (
+          <Button type="button" variant="secondary" size="lg" className="w-full" onClick={handleGoogle}>
+            <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0">
               <path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.5-.2-2.2H12v4h5.4a4.6 4.6 0 0 1-2 3v2.6h3.3c1.9-1.8 2.9-4.4 2.9-7.4Z"/>
               <path fill="#34A853" d="M12 22c2.7 0 5-.9 6.7-2.4L15.4 17c-.9.6-2.1 1-3.4 1a5.9 5.9 0 0 1-5.5-4.1H3.1v2.7A10 10 0 0 0 12 22Z"/>
               <path fill="#FBBC05" d="M6.5 13.9a6 6 0 0 1 0-3.8V7.4H3.1a10 10 0 0 0 0 9.2l3.4-2.7Z"/>
@@ -120,8 +136,8 @@ export function AuthForm({
             </svg>
             Continue with Google
           </Button>
-        </>
-      )}
+        )}
+      </div>
     </form>
   );
 }

@@ -22,7 +22,9 @@ export async function sendCartlyEmail(input: EmailInput) {
       "content-type": "application/json"
     },
     body: JSON.stringify({
-      from: "Cartly <alerts@cartly.app>",
+      // Configurable so it works with Resend's pre-verified onboarding@resend.dev
+      // for testing, or your own verified domain once set up.
+      from: process.env.EMAIL_FROM || "Cartly <onboarding@resend.dev>",
       to: input.to,
       subject: input.subject,
       html: `<div style="font-family:Inter,Arial,sans-serif;background:#0F0F0F;color:#fff;padding:40px"><div style="max-width:560px;margin:auto"><div style="font-size:22px;font-weight:800;color:#C8FF00">Cartly</div><h1 style="font-size:28px;margin:32px 0 12px">${input.title}</h1><p style="color:#A3A3A3;line-height:1.7">${input.body}</p>${cta}<p style="color:#666;font-size:12px;margin-top:40px">Save it. Track it. Buy it when it’s right.</p></div></div>`

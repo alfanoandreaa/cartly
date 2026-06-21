@@ -4,6 +4,7 @@ import { Logo } from "@/components/brand/logo";
 import { AuthForm } from "@/components/auth/auth-form";
 
 export default function SignUpPage() {
+  const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
       <section className="flex min-h-screen flex-col px-5 py-6 sm:px-10 lg:px-16">
@@ -12,7 +13,7 @@ export default function SignUpPage() {
           <p className="text-sm font-semibold text-lime">START FOR FREE</p>
           <h1 className="mt-2 text-4xl font-bold tracking-tight">Give your wishlist a brain.</h1>
           <p className="mt-3 text-muted">Six picks are on us. No card, no pressure, no clutter.</p>
-          <AuthForm mode="signup" />
+          <AuthForm mode="signup" googleEnabled={googleEnabled} />
           <p className="mt-7 text-center text-sm text-muted">
             Already have Cartly? <Link href="/auth/signin" className="font-semibold text-white hover:text-lime">Sign in</Link>
           </p>

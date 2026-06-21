@@ -1,20 +1,24 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
-import { AuthForm } from "@/components/auth/auth-form";
+import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
 
-export default function SignInPage() {
-  const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+export default function ForgotPasswordPage() {
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
       <section className="flex min-h-screen flex-col px-5 py-6 sm:px-10 lg:px-16">
         <Logo />
         <div className="my-auto mx-auto w-full max-w-md py-12">
-          <p className="text-sm font-semibold text-lime">WELCOME BACK</p>
-          <h1 className="mt-2 text-4xl font-bold tracking-tight">Your picks missed you.</h1>
-          <p className="mt-3 text-muted">Sign in and see what changed while you were away.</p>
-          <AuthForm mode="signin" googleEnabled={googleEnabled} />
+          <p className="text-sm font-semibold text-lime">FORGOT YOUR PASSWORD?</p>
+          <h1 className="mt-2 text-4xl font-bold tracking-tight">No worries.</h1>
+          <p className="mt-3 text-muted">
+            Enter your account email and we’ll send you a link to set a new password.
+          </p>
+          <ForgotPasswordForm />
           <p className="mt-7 text-center text-sm text-muted">
-            New to Cartly? <Link href="/auth/signup" className="font-semibold text-white hover:text-lime">Create an account</Link>
+            New to Cartly?{" "}
+            <Link href="/auth/signup" className="font-semibold text-white hover:text-lime">
+              Create an account
+            </Link>
           </p>
         </div>
       </section>

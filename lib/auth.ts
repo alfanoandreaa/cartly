@@ -57,9 +57,19 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   );
 }
 
+// Keep people signed in for a month, refreshed on every visit, so closing the
+// browser and coming back days later never loses the account.
+const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
+const PLAN_REFRESH_INTERVAL = 5 * 60 * 1000; // re-read plan from DB every 5 min
+
 export const authOptions: NextAuthOptions = {
   providers,
-  session: { strategy: "jwt" },
+  session: {
+    strategy: "jwt",
+    maxAge: SESSION_MAX_AGE,
+    updateAge: 60 * 60 * 24 // slide the expiry forward at most once a day
+  },
+  jwt: { maxAge: SESSION_MAX_AGE },
   pages: { signIn: "/auth/signin" },
   callbacks: {
     async signIn({ user, account }) {
@@ -73,10 +83,30 @@ export const authOptions: NextAuthOptions = {
       user.plan = dbUser.plan;
       return true;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
         token.plan = user.plan ?? "FREE";
+        token.planSyncedAt = Date.now();
+        return token;
+      }
+
+      // On later requests, refresh the plan/name from the database periodically
+      // (and immediately when the client calls update()), so a Pro upgrade or a
+      // profile edit is reflected without forcing a fresh login.
+      const stale =
+        trigger === "update" ||
+        typeof token.planSyncedAt !== "number" ||
+        Date.now() - token.planSyncedAt > PLAN_REFRESH_INTERVAL;
+      if (process.env.DATABASE_URL && token.id && token.id !== "demo-user" && stale) {
+        const dbUser = await prisma.user
+          .findUnique({ where: { id: token.id }, select: { plan: true, name: true } })
+          .catch(() => null);
+        if (dbUser) {
+          token.plan = dbUser.plan;
+          token.name = dbUser.name;
+          token.planSyncedAt = Date.now();
+        }
       }
       return token;
     },

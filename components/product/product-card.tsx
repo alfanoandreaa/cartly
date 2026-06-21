@@ -261,7 +261,7 @@ export function ProductCard({
             className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-lime transition hover:text-white disabled:opacity-60"
           >
             <RefreshCw className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`} />
-            Aggiorna prezzo
+            Refresh price
           </button>
         </div>
         <div className="hidden sm:block">
@@ -339,7 +339,7 @@ export function ProductCard({
           className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-line text-xs font-semibold text-muted transition hover:border-lime/40 hover:text-lime disabled:opacity-60"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
-          {refreshing ? "Aggiornamento…" : "Aggiorna prezzo"}
+          {refreshing ? "Refreshing…" : "Refresh price"}
         </button>
       </div>
     </article>

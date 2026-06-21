@@ -59,6 +59,7 @@ model Product {
   imageUrl       String?
   siteName       String?
   price          Decimal?     @db.Decimal(12, 2)
+  oldPrice       Decimal?     @db.Decimal(12, 2)
   priceCurrency  String       @default("EUR")
   priceHistory   Json         @default("[]")
   inStock        Boolean      @default(true)

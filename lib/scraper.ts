@@ -10,6 +10,7 @@ export type ScrapedProduct = {
   title: string;
   imageUrl: string | null;
   price: number | null;
+  oldPrice: number | null;
   currency: string;
   siteName: string;
   inStock: boolean;
@@ -114,6 +115,15 @@ async function fetchStructuredProduct(
     null;
   const price = normalizePrice(typeof rawPrice === "string" ? rawPrice : String(rawPrice ?? ""));
 
+  // Original / list price (the struck-through "was" price) for discount display.
+  const rawListPrice =
+    data.list_price ?? data.original_price ?? data.buybox_winner?.rrp ?? null;
+  const listPrice = normalizePrice(
+    typeof rawListPrice === "string" ? rawListPrice : String(rawListPrice ?? "")
+  );
+  const oldPrice =
+    listPrice !== null && price !== null && listPrice > price ? listPrice : null;
+
   const title =
     cleanText(data.name ?? data.title ?? data.product_name ?? "") || "Untitled pick";
 
@@ -135,6 +145,7 @@ async function fetchStructuredProduct(
     title: title.slice(0, 240),
     imageUrl,
     price,
+    oldPrice,
     currency: inferCurrency(String(rawPrice ?? "")) ?? adapter.defaultCurrency?.(hostname) ?? "EUR",
     siteName: adapter.name,
     inStock: true,
@@ -452,6 +463,48 @@ export function extractPriceByHierarchy(
   );
 }
 
+// Common markup for the original / struck-through price across retailers.
+const LIST_PRICE_SELECTORS = [
+  ".basisPrice .a-offscreen",
+  ".a-text-price .a-offscreen",
+  '[data-a-strike="true"] .a-offscreen',
+  '[class*="list-price"]',
+  '[class*="listPrice"]',
+  '[class*="old-price"]',
+  '[class*="oldPrice"]',
+  '[class*="was-price"]',
+  '[class*="original-price"]',
+  '[class*="originalPrice"]',
+  '[class*="price--old"]',
+  '[class*="strikethrough"]',
+  "del",
+  "s"
+];
+
+// The original price (for discount display). Only returned when it is higher
+// than the current price, which filters out unrelated struck-through text.
+function extractListPrice($: cheerio.CheerioAPI, currentPrice: number | null) {
+  for (const product of jsonLdProducts($)) {
+    const offers = product.offers;
+    if (offers && typeof offers === "object" && !Array.isArray(offers)) {
+      const high = normalizePrice(offers.highPrice);
+      if (high !== null && (currentPrice === null || high > currentPrice)) return high;
+    }
+  }
+
+  for (const selector of LIST_PRICE_SELECTORS) {
+    for (const node of $(selector).slice(0, 8).toArray()) {
+      const element = $(node);
+      const text = cleanText(element.attr("content") || element.text());
+      const [price] = priceValuesFromText(text);
+      if (price !== undefined && (currentPrice === null || price > currentPrice)) {
+        return price;
+      }
+    }
+  }
+  return null;
+}
+
 function resolveImage(raw: string, sourceUrl: string) {
   if (!raw) return null;
   try {
@@ -504,10 +557,15 @@ function extractMetadata(
     .filter(Boolean)
     .join(" ");
 
+  const oldPrice = extractedPrice
+    ? extractListPrice($, extractedPrice.price)
+    : null;
+
   return {
     title: title.slice(0, 240),
     imageUrl: resolveImage(image, sourceUrl),
     price: extractedPrice?.price ?? null,
+    oldPrice,
     currency:
       extractedPrice?.currency ||
       adapter.defaultCurrency?.(hostname) ||
@@ -620,6 +678,7 @@ function manualFallback(url: string, adapter: StoreAdapter): ScrapedProduct {
     title: "Untitled pick",
     imageUrl: null,
     price: null,
+    oldPrice: null,
     currency: adapter.defaultCurrency?.(hostname) || "EUR",
     siteName: adapter.key === "generic" ? hostname.replace(/^www\./, "").split(".")[0] : adapter.name,
     inStock: true,

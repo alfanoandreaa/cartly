@@ -20,6 +20,7 @@ type ScrapeResult = {
   title: string;
   imageUrl: string | null;
   price: number | null;
+  oldPrice?: number | null;
   currency: string;
   siteName: string;
   inStock: boolean;
@@ -199,7 +200,7 @@ export function AddProductForm() {
         progress: 100,
         message: missing.length
           ? collected.price === null
-            ? "Prezzo non rilevato — inseriscilo manualmente"
+            ? "Price not detected — enter it manually"
             : `Details collected. Please review the ${missing.join(", ")}.`
           : "Title, price, and image collected successfully.",
         storeName: collected.siteName,
@@ -247,6 +248,7 @@ export function AddProductForm() {
       title: String(data.get("title") ?? ""),
       imageUrl: String(data.get("imageUrl") ?? ""),
       price: parseManualPrice(priceValue),
+      oldPrice: result.oldPrice ?? null,
       priceCurrency: String(data.get("currency") ?? result.currency).toUpperCase(),
       siteName: result.siteName,
       inStock: result.inStock,
@@ -448,7 +450,7 @@ export function AddProductForm() {
                   defaultValue={result.price ?? ""}
                   placeholder={
                     result.price === null
-                      ? "Prezzo non rilevato — inseriscilo manualmente"
+                      ? "Price not detected — enter it manually"
                       : undefined
                   }
                   className={`focus-ring h-12 w-full rounded-xl border bg-card px-4 text-sm ${

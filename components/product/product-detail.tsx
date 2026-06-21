@@ -124,7 +124,7 @@ export function ProductDetailLoader({ id }: { id: string }) {
     if (!response.ok) {
       throw new Error(
         body.error === "PRICE_NOT_FOUND"
-          ? "Prezzo non rilevato. Il prezzo salvato non è stato modificato."
+          ? "Price not detected. Your saved price was left unchanged."
           : body.message ?? body.error ?? "Could not refresh this price"
       );
     }
@@ -261,7 +261,7 @@ function ProductDetail({
                 setRefreshing(true);
                 try {
                   const changed = await onRefresh();
-                  toast.success(changed ? "Prezzo aggiornato" : "Il prezzo è ancora invariato");
+                  toast.success(changed ? "Price updated" : "Price is still the same");
                 } catch (caught) {
                   toast.error(caught instanceof Error ? caught.message : "Could not refresh this price");
                 } finally {
@@ -270,7 +270,7 @@ function ProductDetail({
               }}
             >
               <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-              {refreshing ? "Aggiornamento…" : "Aggiorna prezzo"}
+              {refreshing ? "Refreshing…" : "Refresh price"}
             </Button>
           </div>
           <div className="mt-8 rounded-2xl border border-line bg-surface p-5">

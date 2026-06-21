@@ -64,7 +64,7 @@ export async function POST(
   const scraped = await scrapeProduct(product.url);
   if (scraped.price === null) {
     return NextResponse.json(
-      { error: "PRICE_NOT_FOUND", message: "Prezzo non rilevato." },
+      { error: "PRICE_NOT_FOUND", message: "Price not detected." },
       { status: 422 }
     );
   }

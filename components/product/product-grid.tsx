@@ -182,7 +182,7 @@ export function ProductGrid() {
       if (!response.ok) {
         throw new Error(
           body.error === "PRICE_NOT_FOUND"
-            ? "Prezzo non rilevato. Il prezzo salvato non è stato modificato."
+            ? "Price not detected. Your saved price was left unchanged."
             : body.message ?? body.error ?? "Could not refresh this price"
         );
       }
@@ -207,8 +207,8 @@ export function ProductGrid() {
       if (clientStorage.current) writeLocalPicks(email, next);
       toast.success(
         body.changed
-          ? `Prezzo aggiornato: ${body.priceCurrency} ${Number(body.price).toFixed(2)}`
-          : "Il prezzo è ancora invariato"
+          ? `Price updated: ${body.priceCurrency} ${Number(body.price).toFixed(2)}`
+          : "Price is still the same"
       );
     } catch (caught) {
       toast.error(caught instanceof Error ? caught.message : "Could not refresh this price");

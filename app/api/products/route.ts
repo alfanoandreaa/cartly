@@ -10,6 +10,7 @@ const productSchema = z.object({
   imageUrl: z.string().url().or(z.literal("")).nullable().optional(),
   siteName: z.string().max(100).nullable().optional(),
   price: z.number().nonnegative().nullable().optional(),
+  oldPrice: z.number().nonnegative().nullable().optional(),
   priceCurrency: z.string().length(3).default("EUR"),
   inStock: z.boolean().default(true),
   personalNote: z.string().max(500).nullable().optional(),

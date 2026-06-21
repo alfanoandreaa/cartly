@@ -128,7 +128,8 @@ export async function GET(request: Request) {
       : requestedCadence === "pro"
         ? "PRO"
         : "ALL";
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const cutoffMs = cadence === "PRO" ? 60 * 60 * 1000 : 3 * 24 * 60 * 60 * 1000;
+  const cutoff = new Date(Date.now() - cutoffMs);
   const products = await prisma.product.findMany({
     where: {
       ...(cadence === "ALL" ? {} : { user: { plan: cadence } }),

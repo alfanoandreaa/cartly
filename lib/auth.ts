@@ -42,7 +42,9 @@ const providers: NextAuthOptions["providers"] = [
         email: user.email,
         name: user.name,
         image: user.image,
-        plan: user.plan
+        plan: user.plan,
+        accentColor: user.accentColor,
+        locale: user.locale
       };
     }
   })
@@ -81,12 +83,16 @@ export const authOptions: NextAuthOptions = {
       });
       user.id = dbUser.id;
       user.plan = dbUser.plan;
+      user.accentColor = dbUser.accentColor;
+      user.locale = dbUser.locale;
       return true;
     },
     async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
         token.plan = user.plan ?? "FREE";
+        token.accentColor = user.accentColor ?? null;
+        token.locale = user.locale ?? null;
         token.planSyncedAt = Date.now();
         return token;
       }
@@ -100,11 +106,16 @@ export const authOptions: NextAuthOptions = {
         Date.now() - token.planSyncedAt > PLAN_REFRESH_INTERVAL;
       if (process.env.DATABASE_URL && token.id && token.id !== "demo-user" && stale) {
         const dbUser = await prisma.user
-          .findUnique({ where: { id: token.id }, select: { plan: true, name: true } })
+          .findUnique({
+            where: { id: token.id },
+            select: { plan: true, name: true, accentColor: true, locale: true }
+          })
           .catch(() => null);
         if (dbUser) {
           token.plan = dbUser.plan;
           token.name = dbUser.name;
+          token.accentColor = dbUser.accentColor;
+          token.locale = dbUser.locale;
           token.planSyncedAt = Date.now();
         }
       }
@@ -113,6 +124,8 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       session.user.id = token.id ?? "demo-user";
       session.user.plan = token.plan ?? "FREE";
+      session.user.accentColor = token.accentColor ?? null;
+      session.user.locale = token.locale ?? null;
       return session;
     }
   },

@@ -5,26 +5,35 @@ import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
-const schema = z.object({ name: z.string().trim().min(2).max(80) });
+const schema = z
+  .object({
+    name: z.string().trim().min(2).max(80).optional(),
+    accentColor: z.string().trim().max(20).optional(),
+    locale: z.string().trim().max(8).optional()
+  })
+  .refine(
+    (value) => value.name !== undefined || value.accentColor !== undefined || value.locale !== undefined,
+    { message: "Nothing to update." }
+  );
 
 export async function PATCH(request: Request) {
   const user = await getCurrentUser();
   const parsed = schema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) {
-    return NextResponse.json({ error: "Please enter a valid name." }, { status: 400 });
+    return NextResponse.json({ error: "Please provide valid settings." }, { status: 400 });
   }
 
+  // Only persist the fields that were actually sent.
+  const data = parsed.data;
+
   if (!process.env.DATABASE_URL || user.id === "demo-user") {
-    return NextResponse.json(
-      { name: parsed.data.name },
-      { headers: { "x-cartly-client-storage": "true" } }
-    );
+    return NextResponse.json(data, { headers: { "x-cartly-client-storage": "true" } });
   }
 
   const updated = await prisma.user.update({
     where: { id: user.id },
-    data: { name: parsed.data.name },
-    select: { id: true, name: true, email: true }
+    data,
+    select: { id: true, name: true, email: true, accentColor: true, locale: true }
   });
   return NextResponse.json(updated);
 }

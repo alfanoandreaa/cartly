@@ -2,6 +2,7 @@
 
 import { Check, Globe } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Flag } from "@/components/brand/flag";
 import { useTranslation } from "@/components/providers/i18n-provider";
 import { LOCALES, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -48,7 +49,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
         )}
       >
         <Globe className="h-4 w-4 text-lime" />
-        <span className="text-base leading-none">{active.flag}</span>
+        <Flag code={active.code} />
         <span className="hidden font-medium sm:inline">{active.code.toUpperCase()}</span>
       </button>
 
@@ -70,7 +71,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
                   selected ? "bg-lime/10 text-white" : "text-muted hover:bg-white/[0.05] hover:text-white"
                 )}
               >
-                <span className="text-lg leading-none">{entry.flag}</span>
+                <Flag code={entry.code} />
                 <span className="flex-1 text-left font-medium">{entry.label}</span>
                 {selected && <Check className="h-4 w-4 text-lime" />}
               </button>

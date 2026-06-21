@@ -8,11 +8,15 @@ declare module "next-auth" {
       name?: string | null;
       image?: string | null;
       plan: "FREE" | "PRO";
+      accentColor?: string | null;
+      locale?: string | null;
     };
   }
 
   interface User {
     plan?: "FREE" | "PRO";
+    accentColor?: string | null;
+    locale?: string | null;
   }
 }
 
@@ -21,5 +25,7 @@ declare module "next-auth/jwt" {
     id?: string;
     plan?: "FREE" | "PRO";
     planSyncedAt?: number;
+    accentColor?: string | null;
+    locale?: string | null;
   }
 }

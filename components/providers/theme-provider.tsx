@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import {
   ACCENT_STORAGE_KEY,
   ACCENT_THEMES,
@@ -19,29 +20,53 @@ const ThemeContext = createContext<ThemeContextValue>({
   setAccent: () => {}
 });
 
+function isAccentId(value: unknown): value is AccentId {
+  return typeof value === "string" && ACCENT_THEMES.some((theme) => theme.id === value);
+}
+
 function applyAccent(id: AccentId) {
   if (typeof document === "undefined") return;
   document.documentElement.style.setProperty("--accent-rgb", accentById(id).rgb);
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Start from the default so server and first client render match; the stored
-  // choice is applied right after mount (no hydration mismatch, brief flash at
-  // most). The default accent already lives in globals.css.
+  const { data: session } = useSession();
   const [accent, setAccentState] = useState<AccentId>(DEFAULT_ACCENT);
+  // Once the user picks a colour in this session, stop letting the (possibly
+  // stale) account value reassert itself until the next reload.
+  const userChangedRef = useRef(false);
 
+  // Fast path: apply the locally cached choice immediately on mount.
   useEffect(() => {
     const stored = window.localStorage.getItem(ACCENT_STORAGE_KEY);
-    if (stored && ACCENT_THEMES.some((theme) => theme.id === stored)) {
-      setAccentState(stored as AccentId);
-      applyAccent(stored as AccentId);
+    if (isAccentId(stored)) {
+      setAccentState(stored);
+      applyAccent(stored);
     }
   }, []);
 
+  // Authoritative path: the colour saved on the account wins across devices.
+  const accountAccent = session?.user?.accentColor;
+  useEffect(() => {
+    if (userChangedRef.current) return;
+    if (isAccentId(accountAccent)) {
+      setAccentState(accountAccent);
+      applyAccent(accountAccent);
+      window.localStorage.setItem(ACCENT_STORAGE_KEY, accountAccent);
+    }
+  }, [accountAccent]);
+
   function setAccent(id: AccentId) {
+    userChangedRef.current = true;
     setAccentState(id);
     applyAccent(id);
     window.localStorage.setItem(ACCENT_STORAGE_KEY, id);
+    // Persist to the account (no-op for signed-out / demo users).
+    void fetch("/api/user", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ accentColor: id })
+    }).catch(() => {});
   }
 
   return <ThemeContext.Provider value={{ accent, setAccent }}>{children}</ThemeContext.Provider>;

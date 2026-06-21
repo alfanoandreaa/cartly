@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import {
   Bell,
   ChevronDown,
   FolderHeart,
   LayoutGrid,
+  LogOut,
   Menu,
   Plus,
   Search,
@@ -15,7 +16,7 @@ import {
   Sparkles,
   X
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Logo } from "@/components/brand/logo";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { PlanBadge } from "@/components/layout/plan-badge";
@@ -42,8 +43,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [productCount, setProductCount] = useState(0);
   const [collections, setCollections] = useState<CartlyCollection[]>([]);
+  const accountRef = useRef<HTMLDivElement>(null);
   const plan = session?.user?.plan ?? "FREE";
   const maxProducts = PLAN_LIMITS[plan].products;
   const usage = Math.min(100, (productCount / maxProducts) * 100);
@@ -106,6 +109,23 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       window.removeEventListener("storage", loadSidebarData);
     };
   }, [loadSidebarData]);
+
+  useEffect(() => {
+    function onPointerDown(event: MouseEvent) {
+      if (accountRef.current && !accountRef.current.contains(event.target as Node)) {
+        setAccountOpen(false);
+      }
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setAccountOpen(false);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
 
   const sidebar = (
     <aside className="flex h-full flex-col bg-[#141414]">
@@ -190,12 +210,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </button>
           )}
         </div>
-        <Link
-          href="/app/dashboard/settings"
-          className="mt-3 flex h-11 items-center gap-3 rounded-xl px-3 text-sm text-muted transition hover:bg-white/[0.04] hover:text-white"
-        >
-          <Settings className="h-[18px] w-[18px]" /> {t("nav.settings")}
-        </Link>
       </div>
     </aside>
   );
@@ -232,12 +246,44 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <button className="relative grid h-10 w-10 place-items-center rounded-xl text-muted transition hover:bg-white/5 hover:text-white" aria-label="Notifications">
               <Bell className="h-[18px] w-[18px]" />
             </button>
-            <button className="flex h-10 items-center gap-2 rounded-xl pl-1 pr-2 transition hover:bg-white/5" aria-label="Account menu">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-lime to-emerald-500 text-xs font-bold text-ink">
-                {initials || "CU"}
-              </span>
-              <ChevronDown className="hidden h-3.5 w-3.5 text-muted sm:block" />
-            </button>
+            <div className="relative" ref={accountRef}>
+              <button
+                onClick={() => setAccountOpen((value) => !value)}
+                aria-haspopup="menu"
+                aria-expanded={accountOpen}
+                className="flex h-10 items-center gap-2 rounded-xl pl-1 pr-2 transition hover:bg-white/5"
+                aria-label="Account menu"
+              >
+                <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-lime to-emerald-500 text-xs font-bold text-ink">
+                  {initials || "CU"}
+                </span>
+                <ChevronDown className={cn("hidden h-3.5 w-3.5 text-muted transition sm:block", accountOpen && "rotate-180")} />
+              </button>
+
+              {accountOpen && (
+                <div role="menu" className="absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-2xl border border-line bg-card p-1.5 shadow-card">
+                  <div className="border-b border-line px-3 py-3">
+                    <p className="truncate text-sm font-semibold">{session?.user?.name || t("settings.yourAccount")}</p>
+                    <p className="mt-0.5 truncate text-xs text-muted">{session?.user?.email || t("settings.signedIn")}</p>
+                  </div>
+                  <Link
+                    href="/app/dashboard/settings"
+                    role="menuitem"
+                    onClick={() => setAccountOpen(false)}
+                    className="mt-1.5 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted transition hover:bg-white/[0.05] hover:text-white"
+                  >
+                    <Settings className="h-[18px] w-[18px]" /> {t("nav.settings")}
+                  </Link>
+                  <button
+                    role="menuitem"
+                    onClick={() => signOut({ callbackUrl: "/" })}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted transition hover:bg-white/[0.05] hover:text-white"
+                  >
+                    <LogOut className="h-[18px] w-[18px]" /> {t("settings.signout")}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
         <main className="min-h-[calc(100vh-4rem)]">{children}</main>

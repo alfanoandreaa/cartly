@@ -286,6 +286,42 @@ function isPrivateAddress(address: string) {
   return normalized.startsWith("fc") || normalized.startsWith("fd") || normalized.startsWith("fe80:");
 }
 
+// URL shorteners used by retailers (Amazon's share links, eBay, generic ones).
+// Their host hides the real store, so we expand them before scraping.
+const SHORTENER_HOSTS = [
+  /^amzn\.(to|eu|asia)$/i,
+  /^a\.co$/i,
+  /^ebay\.(us|to)$/i,
+  /^bit\.ly$/i,
+  /^tinyurl\.com$/i,
+  /^t\.co$/i
+];
+
+function isShortenerHost(hostname: string) {
+  const host = hostname.toLowerCase().replace(/^www\./, "");
+  return SHORTENER_HOSTS.some((re) => re.test(host));
+}
+
+// Follow a short link to its destination so detectStore() sees the real store
+// and ScraperAPI's structured parser (which keys off the host) can kick in.
+async function expandShortLink(url: URL, report?: ProgressReporter): Promise<URL> {
+  if (!isShortenerHost(url.hostname)) return url;
+  await report?.({ stage: "validating", progress: 14, message: "Expanding the short link…" });
+  try {
+    const response = await fetch(url.toString(), {
+      headers,
+      redirect: "follow",
+      signal: AbortSignal.timeout(12_000),
+      cache: "no-store"
+    });
+    if (!response.url || response.url === url.toString()) return url;
+    return await assertPublicUrl(response.url);
+  } catch {
+    // Couldn't expand it — fall back to the original link.
+    return url;
+  }
+}
+
 async function assertPublicUrl(input: string) {
   const url = new URL(input);
   if (!["http:", "https:"].includes(url.protocol)) throw new Error("Unsupported URL protocol");
@@ -690,9 +726,11 @@ function manualFallback(url: string, adapter: StoreAdapter): ScrapedProduct {
 
 export async function scrapeProduct(input: string, report?: ProgressReporter): Promise<ScrapedProduct> {
   await report?.({ stage: "validating", progress: 10, message: "Checking the product link…" });
-  const url = z.string().url().parse(input);
-  const publicUrl = await assertPublicUrl(url);
-  let adapter = detectStore(publicUrl);
+  const parsedInput = z.string().url().parse(input);
+  const publicUrl = await assertPublicUrl(parsedInput);
+  // Expand share/short links (amzn.eu, a.co, …) to the real product URL first.
+  const url = (await expandShortLink(publicUrl, report)).toString();
+  let adapter = detectStore(url);
 
   await report?.({
     stage: "detecting",

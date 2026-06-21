@@ -4,6 +4,7 @@ import { Check, Download, LogOut, Save, Trash2 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Flag } from "@/components/brand/flag";
 import { PlanBadge } from "@/components/layout/plan-badge";
 import { useTranslation } from "@/components/providers/i18n-provider";
 import { useAccent } from "@/components/providers/theme-provider";
@@ -169,7 +170,7 @@ export function SettingsView() {
                     selected ? "border-lime bg-lime/10 text-white" : "border-line bg-card text-muted hover:text-white"
                   )}
                 >
-                  <span className="text-base leading-none">{entry.flag}</span>
+                  <Flag code={entry.code} />
                   {entry.label}
                 </button>
               );

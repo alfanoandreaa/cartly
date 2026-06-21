@@ -37,6 +37,8 @@ model User {
   passwordHash         String?
   name                 String?
   image                String?
+  accentColor          String?
+  locale               String?
   plan                 Plan         @default(FREE)
   stripeCustomerId     String?      @unique
   stripeSubscriptionId String?      @unique

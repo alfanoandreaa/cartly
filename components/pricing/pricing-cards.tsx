@@ -4,26 +4,28 @@ import Link from "next/link";
 import { Check, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/components/providers/i18n-provider";
 import { cn } from "@/lib/utils";
 
-const freeFeatures = [
-  "Save up to 6 products",
-  "Create up to 3 collections",
-  "Daily price refresh",
-  "Notes, tags, and priorities"
-];
-
-const proFeatures = [
-  "Save up to 20 products",
-  "Unlimited collections",
-  "Price and stock alerts",
-  "Public sharing",
-  "Priority 6-hour refresh",
-  "Advanced price history"
-];
-
 export function PricingCards({ compact = false }: { compact?: boolean }) {
+  const { t } = useTranslation();
   const [annual, setAnnual] = useState(true);
+
+  const freeFeatures = [
+    t("pricing.freeFeat1"),
+    t("pricing.freeFeat2"),
+    t("pricing.freeFeat3"),
+    t("pricing.freeFeat4")
+  ];
+
+  const proFeatures = [
+    t("pricing.proFeat1"),
+    t("pricing.proFeat2"),
+    t("pricing.proFeat3"),
+    t("pricing.proFeat4"),
+    t("pricing.proFeat5"),
+    t("pricing.proFeat6")
+  ];
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -33,26 +35,26 @@ export function PricingCards({ compact = false }: { compact?: boolean }) {
             onClick={() => setAnnual(false)}
             className={cn("rounded-lg px-4 py-2 transition", !annual ? "bg-card text-white" : "text-muted")}
           >
-            Monthly
+            {t("pricing.monthly")}
           </button>
           <button
             onClick={() => setAnnual(true)}
             className={cn("rounded-lg px-4 py-2 transition", annual ? "bg-card text-white" : "text-muted")}
           >
-            Yearly <span className="ml-1 text-lime">Save 30%</span>
+            {t("pricing.yearly")} <span className="ml-1 text-lime">{t("pricing.saveBadge")}</span>
           </button>
         </div>
       </div>
       <div className="grid gap-5 md:grid-cols-2">
         <article className="rounded-3xl border border-line bg-surface p-7 sm:p-9">
-          <p className="text-sm font-semibold text-muted">FREE</p>
+          <p className="text-sm font-semibold text-muted">{t("pricing.free")}</p>
           <div className="mt-5 flex items-end gap-2">
             <span className="text-5xl font-bold tracking-tight">€0</span>
-            <span className="mb-1 text-muted">forever</span>
+            <span className="mb-1 text-muted">{t("pricing.forever")}</span>
           </div>
-          <p className="mt-4 max-w-sm text-muted">The cleanest way to keep a focused shopping shortlist.</p>
+          <p className="mt-4 max-w-sm text-muted">{t("pricing.freeTagline")}</p>
           <Button asChild variant="secondary" className="mt-7 w-full">
-            <Link href="/auth/signup">Start saving for free</Link>
+            <Link href="/auth/signup">{t("pricing.freeCta")}</Link>
           </Button>
           <ul className="mt-8 space-y-4 text-sm">
             {freeFeatures.map((feature) => (
@@ -69,27 +71,25 @@ export function PricingCards({ compact = false }: { compact?: boolean }) {
           <div className="relative">
             <div className="flex items-center justify-between">
               <p className="flex items-center gap-2 text-sm font-semibold text-lime">
-                <Sparkles className="h-4 w-4" /> CARTLY PRO
+                <Sparkles className="h-4 w-4" /> {t("pricing.proLabel")}
               </p>
-              <span className="rounded-full bg-lime px-3 py-1 text-xs font-bold text-ink">MOST LOVED</span>
+              <span className="rounded-full bg-lime px-3 py-1 text-xs font-bold text-ink">{t("pricing.mostLoved")}</span>
             </div>
             <div className="mt-5 flex items-end gap-2">
               <span className="text-5xl font-bold tracking-tight">€{annual ? "4.99" : "6.99"}</span>
-              <span className="mb-1 text-muted">/ month</span>
+              <span className="mb-1 text-muted">{t("pricing.perMonth")}</span>
             </div>
             <p className="mt-2 text-sm text-lime">
-              {annual ? "€49,99 billed yearly — save €33,89" : "€83,88 total/year — cancel anytime"}
+              {annual ? t("pricing.annualNote") : t("pricing.monthlyNote")}
             </p>
-            <p className="mt-4 max-w-sm text-muted">
-              For thoughtful shoppers who want the right thing at the right price.
-            </p>
+            <p className="mt-4 max-w-sm text-muted">{t("pricing.proTagline")}</p>
             <Button
               className="mt-7 w-full"
               onClick={() => {
                 window.location.href = `/api/stripe/checkout?interval=${annual ? "year" : "month"}`;
               }}
             >
-              Go Cartly Pro
+              {t("pricing.proCta")}
             </Button>
             <ul className="mt-8 space-y-4 text-sm">
               {proFeatures.slice(0, compact ? 4 : undefined).map((feature) => (

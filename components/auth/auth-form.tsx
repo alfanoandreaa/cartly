@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/components/providers/i18n-provider";
 import { setRememberPreference } from "@/lib/remember";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +18,7 @@ export function AuthForm({
   googleEnabled?: boolean;
 }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [remember, setRemember] = useState(true);
@@ -44,17 +46,17 @@ export function AuthForm({
         });
         if (!response.ok) {
           const body = await response.json();
-          throw new Error(body.error ?? "Could not create your account");
+          throw new Error(body.error ?? t("auth.errCreate"));
         }
       }
 
       setRememberPreference(remember);
       const result = await signIn("credentials", { email, password, redirect: false });
-      if (result?.error) throw new Error("Email or password not recognized");
+      if (result?.error) throw new Error(t("auth.errCredentials"));
       router.push(mode === "signup" ? "/app/onboarding" : "/app/dashboard");
       router.refresh();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Something went wrong");
+      setError(caught instanceof Error ? caught.message : t("auth.errGeneric"));
     } finally {
       setLoading(false);
     }
@@ -64,7 +66,7 @@ export function AuthForm({
     <form onSubmit={onSubmit} className="mt-8 space-y-5">
       {mode === "signup" && (
         <label className="block">
-          <span className="mb-2 block text-sm font-medium">Your name</span>
+          <span className="mb-2 block text-sm font-medium">{t("auth.name")}</span>
           <input
             name="name"
             required
@@ -75,7 +77,7 @@ export function AuthForm({
         </label>
       )}
       <label className="block">
-        <span className="mb-2 block text-sm font-medium">Email</span>
+        <span className="mb-2 block text-sm font-medium">{t("auth.email")}</span>
         <input
           name="email"
           type="email"
@@ -87,8 +89,8 @@ export function AuthForm({
       </label>
       <label className="block">
         <span className="mb-2 flex items-center justify-between text-sm font-medium">
-          Password
-          {mode === "signin" && <Link href="/auth/forgot" className="text-xs text-lime hover:underline">Forgot?</Link>}
+          {t("auth.password")}
+          {mode === "signin" && <Link href="/auth/forgot" className="text-xs text-lime hover:underline">{t("auth.forgot")}</Link>}
         </span>
         <span className="relative block">
           <input
@@ -97,7 +99,7 @@ export function AuthForm({
             required
             minLength={6}
             autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            placeholder="At least 6 characters"
+            placeholder={t("auth.passwordPlaceholder")}
             className="focus-ring h-12 w-full rounded-xl border border-line bg-surface px-4 pr-12 text-sm placeholder:text-muted/60"
           />
           <button
@@ -118,12 +120,12 @@ export function AuthForm({
           onChange={(event) => setRemember(event.target.checked)}
           className="h-4 w-4 rounded accent-lime"
         />
-        Keep me signed in on this device
+        {t("auth.remember")}
       </label>
 
       <div className={cn("grid gap-3", googleEnabled && "sm:grid-cols-2")}>
         <Button type="submit" size="lg" className="w-full" disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === "signup" ? "Create an account" : "Sign in"}
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === "signup" ? t("auth.createAccount") : t("nav.signIn")}
           {!loading && <ArrowRight className="h-4 w-4" />}
         </Button>
         {googleEnabled && (
@@ -134,7 +136,7 @@ export function AuthForm({
               <path fill="#FBBC05" d="M6.5 13.9a6 6 0 0 1 0-3.8V7.4H3.1a10 10 0 0 0 0 9.2l3.4-2.7Z"/>
               <path fill="#EA4335" d="M12 6c1.5 0 2.9.5 4 1.6l3-3A10 10 0 0 0 3.1 7.4l3.4 2.7A5.9 5.9 0 0 1 12 6Z"/>
             </svg>
-            Continue with Google
+            {t("auth.google")}
           </Button>
         )}
       </div>

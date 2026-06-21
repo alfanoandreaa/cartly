@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { ArrowRight, CheckCircle2, Eye, EyeOff, Loader2 } from "lucide-react";
-import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/components/providers/i18n-provider";
 
 export function ResetPasswordForm() {
   const router = useRouter();
+  const { t } = useTranslation();
   const params = useSearchParams();
   const token = params.get("token") ?? "";
   const [showPassword, setShowPassword] = useState(false);
@@ -25,7 +26,7 @@ export function ResetPasswordForm() {
     const confirm = String(data.get("confirm"));
 
     if (password !== confirm) {
-      setError("The two passwords don’t match.");
+      setError(t("auth.passwordsNoMatch"));
       setLoading(false);
       return;
     }
@@ -37,13 +38,11 @@ export function ResetPasswordForm() {
         body: JSON.stringify({ token, password })
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error ?? "Could not reset your password");
+      if (!response.ok) throw new Error(body.error ?? t("auth.errReset"));
       setDone(true);
-      // Best-effort auto sign-in is skipped (we don't have the email here);
-      // send the user to sign in with their new password.
       setTimeout(() => router.push("/auth/signin"), 1800);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Something went wrong");
+      setError(caught instanceof Error ? caught.message : t("auth.errGeneric"));
     } finally {
       setLoading(false);
     }
@@ -52,12 +51,10 @@ export function ResetPasswordForm() {
   if (!token) {
     return (
       <div className="mt-8 rounded-2xl border border-coral/20 bg-coral/[0.06] p-6 text-center">
-        <h2 className="text-lg font-semibold text-coral">Invalid reset link</h2>
-        <p className="mt-2 text-sm text-muted">
-          This link is missing its token. Please request a new reset email.
-        </p>
+        <h2 className="text-lg font-semibold text-coral">{t("auth.invalidLink")}</h2>
+        <p className="mt-2 text-sm text-muted">{t("auth.invalidLinkBody")}</p>
         <Button asChild className="mt-5">
-          <Link href="/auth/forgot">Request a new link</Link>
+          <Link href="/auth/forgot">{t("auth.requestNew")}</Link>
         </Button>
       </div>
     );
@@ -69,8 +66,8 @@ export function ResetPasswordForm() {
         <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-lime/15 text-lime">
           <CheckCircle2 className="h-6 w-6" />
         </span>
-        <h2 className="mt-4 text-lg font-semibold">Password updated</h2>
-        <p className="mt-2 text-sm text-muted">Taking you to sign in…</p>
+        <h2 className="mt-4 text-lg font-semibold">{t("auth.passwordUpdated")}</h2>
+        <p className="mt-2 text-sm text-muted">{t("auth.takingToSignin")}</p>
       </div>
     );
   }
@@ -78,7 +75,7 @@ export function ResetPasswordForm() {
   return (
     <form onSubmit={onSubmit} className="mt-8 space-y-5">
       <label className="block">
-        <span className="mb-2 block text-sm font-medium">New password</span>
+        <span className="mb-2 block text-sm font-medium">{t("auth.newPassword")}</span>
         <span className="relative block">
           <input
             name="password"
@@ -86,7 +83,7 @@ export function ResetPasswordForm() {
             required
             minLength={6}
             autoComplete="new-password"
-            placeholder="At least 6 characters"
+            placeholder={t("auth.passwordPlaceholder")}
             className="focus-ring h-12 w-full rounded-xl border border-line bg-surface px-4 pr-12 text-sm placeholder:text-muted/60"
           />
           <button
@@ -99,14 +96,14 @@ export function ResetPasswordForm() {
         </span>
       </label>
       <label className="block">
-        <span className="mb-2 block text-sm font-medium">Confirm new password</span>
+        <span className="mb-2 block text-sm font-medium">{t("auth.confirmPassword")}</span>
         <input
           name="confirm"
           type={showPassword ? "text" : "password"}
           required
           minLength={6}
           autoComplete="new-password"
-          placeholder="Repeat your new password"
+          placeholder={t("auth.repeatPlaceholder")}
           className="focus-ring h-12 w-full rounded-xl border border-line bg-surface px-4 text-sm placeholder:text-muted/60"
         />
       </label>
@@ -114,7 +111,7 @@ export function ResetPasswordForm() {
         <p className="rounded-xl border border-coral/20 bg-coral/10 px-4 py-3 text-sm text-coral">{error}</p>
       )}
       <Button type="submit" size="lg" className="w-full" disabled={loading}>
-        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Set new password"}
+        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t("auth.setNewPassword")}
         {!loading && <ArrowRight className="h-4 w-4" />}
       </Button>
     </form>

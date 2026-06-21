@@ -30,31 +30,43 @@ function applyAccent(id: AccentId) {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [accent, setAccentState] = useState<AccentId>(DEFAULT_ACCENT);
   // Once the user picks a colour in this session, stop letting the (possibly
   // stale) account value reassert itself until the next reload.
   const userChangedRef = useRef(false);
 
-  // Fast path: apply the locally cached choice immediately on mount.
-  useEffect(() => {
-    const stored = window.localStorage.getItem(ACCENT_STORAGE_KEY);
-    if (isAccentId(stored)) {
-      setAccentState(stored);
-      applyAccent(stored);
-    }
-  }, []);
-
-  // Authoritative path: the colour saved on the account wins across devices.
+  // The personal accent belongs to the account, not the browser. Signed-out
+  // visitors (e.g. on the public marketing pages) always see the default colour,
+  // so a previous user's accent never leaks before login. Signed-in members get
+  // their saved colour, falling back to the locally cached one for an instant
+  // paint across reloads.
   const accountAccent = session?.user?.accentColor;
   useEffect(() => {
     if (userChangedRef.current) return;
-    if (isAccentId(accountAccent)) {
-      setAccentState(accountAccent);
-      applyAccent(accountAccent);
-      window.localStorage.setItem(ACCENT_STORAGE_KEY, accountAccent);
+    if (status === "loading") return;
+
+    if (status === "authenticated") {
+      const cached = window.localStorage.getItem(ACCENT_STORAGE_KEY);
+      const next = isAccentId(accountAccent)
+        ? accountAccent
+        : isAccentId(cached)
+          ? cached
+          : DEFAULT_ACCENT;
+      setAccentState(next);
+      applyAccent(next);
+      if (isAccentId(accountAccent)) {
+        window.localStorage.setItem(ACCENT_STORAGE_KEY, accountAccent);
+      }
+    } else {
+      // Not logged in: show the last-used accent from this browser so the
+      // homepage already has the user's colour before they authenticate.
+      const cached = window.localStorage.getItem(ACCENT_STORAGE_KEY);
+      const next = isAccentId(cached) ? cached : DEFAULT_ACCENT;
+      setAccentState(next);
+      applyAccent(next);
     }
-  }, [accountAccent]);
+  }, [status, accountAccent]);
 
   function setAccent(id: AccentId) {
     userChangedRef.current = true;

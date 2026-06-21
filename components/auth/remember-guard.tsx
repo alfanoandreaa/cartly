@@ -32,8 +32,16 @@ export function RememberGuard() {
     settledRef.current = true;
     if (status !== "authenticated") return;
     try {
-      const optedOut = window.localStorage.getItem(REMEMBER_STORAGE_KEY) === "false";
+      const stored = window.localStorage.getItem(REMEMBER_STORAGE_KEY);
+      // First-time migration: key never set → default to "remember me".
+      if (stored === null) {
+        window.localStorage.setItem(REMEMBER_STORAGE_KEY, "true");
+        return;
+      }
+      const optedOut = stored === "false";
       if (optedOut && freshLaunchRef.current) {
+        // Clear the key so the next sign-in (default: remember=true) sticks.
+        window.localStorage.removeItem(REMEMBER_STORAGE_KEY);
         signOut({ callbackUrl: "/auth/signin" });
       }
     } catch {

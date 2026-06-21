@@ -8,7 +8,7 @@ export async function middleware(request: NextRequest) {
   // Without a database Cartly intentionally runs in a read-friendly demo mode.
   if (!process.env.DATABASE_URL) return NextResponse.next();
 
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET ?? "cartly-local-development-secret" });
   if (token) return NextResponse.next();
 
   if (pathname.startsWith("/api/")) {

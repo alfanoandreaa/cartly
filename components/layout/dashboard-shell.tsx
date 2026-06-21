@@ -26,6 +26,7 @@ import {
   readLocalCollections,
   readLocalPicks
 } from "@/lib/client-storage";
+import { PLAN_LIMITS } from "@/lib/limits";
 import { cn } from "@/lib/utils";
 
 const mainLinks = [
@@ -41,7 +42,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [productCount, setProductCount] = useState(0);
   const [collections, setCollections] = useState<CartlyCollection[]>([]);
   const plan = session?.user?.plan ?? "FREE";
-  const maxProducts = plan === "PRO" ? 20 : 10;
+  const maxProducts = PLAN_LIMITS[plan].products;
   const usage = Math.min(100, (productCount / maxProducts) * 100);
   const initials = (session?.user?.name || session?.user?.email || "Cartly user")
     .split(/[\s@]+/)

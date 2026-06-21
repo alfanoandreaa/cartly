@@ -2,11 +2,11 @@
   "crons": [
     {
       "path": "/api/cron/track?cadence=pro",
-      "schedule": "0 * * * *"
+      "schedule": "0 8 * * *"
     },
     {
       "path": "/api/cron/track?cadence=free",
-      "schedule": "0 0 */3 * *"
+      "schedule": "0 9 * * *"
     }
   ]
 }

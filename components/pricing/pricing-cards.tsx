@@ -74,11 +74,11 @@ export function PricingCards({ compact = false }: { compact?: boolean }) {
               <span className="rounded-full bg-lime px-3 py-1 text-xs font-bold text-ink">MOST LOVED</span>
             </div>
             <div className="mt-5 flex items-end gap-2">
-              <span className="text-5xl font-bold tracking-tight">€{annual ? "4.92" : "6.99"}</span>
+              <span className="text-5xl font-bold tracking-tight">€{annual ? "4.99" : "6.99"}</span>
               <span className="mb-1 text-muted">/ month</span>
             </div>
             <p className="mt-2 text-sm text-lime">
-              {annual ? "€59 billed yearly — two months on us" : "Billed monthly, cancel anytime"}
+              {annual ? "€49,99 billed yearly — save €33,89" : "€83,88 total/year — cancel anytime"}
             </p>
             <p className="mt-4 max-w-sm text-muted">
               For thoughtful shoppers who want the right thing at the right price.
